@@ -1,7 +1,9 @@
 import { BrowserWindow, safeStorage, app } from 'electron';
 import https from 'https';
 import crypto from 'crypto';
-import forge from 'node-forge';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const forge = require('node-forge') as typeof import('node-forge');
 import { URL } from 'url';
 import path from 'path';
 import fs from 'fs';
