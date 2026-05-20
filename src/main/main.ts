@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, globalShortcut, Tray, Menu, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadSettings, saveSettings } from './store/settings.js';
@@ -36,7 +36,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173/');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadURL('app://index.html');
+    mainWindow.loadFile(path.join(import.meta.dirname, '../renderer/index.html'));
   }
 
   mainWindow.on('closed', () => {
@@ -179,14 +179,6 @@ function createTray() {
 }
 
 app.whenReady().then(() => {
-  if (!isDev) {
-    protocol.registerFileProtocol('app', (request, callback) => {
-      const urlPath = request.url.replace('app://', '');
-      const filePath = path.join(import.meta.dirname, '../renderer', urlPath);
-      callback({ path: filePath });
-    });
-  }
-
   // Restore saved credentials into auth modules on startup
   const startupSettings = loadSettings();
   if (startupSettings.spotifyClientId) {

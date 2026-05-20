@@ -32,15 +32,19 @@
     ],
     "asar": true,
     "win": {
-      "icon": "build/icon.ico",
+      "icon": "icons/icon.png",
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "signAndEditExecutable": false
@@ -48,21 +52,27 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
+      "installerIcon": "icons/icon.ico",
+      "uninstallerIcon": "icons/icon.ico",
       "license": "LICENSE.txt"
     },
     "mac": {
-      "icon": "build/icon.icns",
+      "icon": "icons/icon.png",
       "category": "public.app-category.music",
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "hardenedRuntime": true,
@@ -71,34 +81,50 @@
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "dmg": {
-      "icon": "build/icon.icns",
+      "icon": "icons/icon.png",
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "linux": {
-      "icon": "build/icons",
+      "icon": "icons/icon.png",
       "category": "AudioVideo",
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "tar.gz",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "desktop": {
-        "Name": "LiveSound",
-        "Comment": "Unified media player for Spotify and YouTube Music",
-        "Categories": "AudioVideo;Audio;Player;",
-        "StartupWMClass": "LiveSound"
+        "entry": {
+          "Name": "LiveSound",
+          "Comment": "Unified media player for Spotify and YouTube Music",
+          "Categories": "AudioVideo;Audio;Player;",
+          "StartupWMClass": "LiveSound"
+        }
       },
       "maintainer": "ccd-69",
       "vendor": "ccd-69",
@@ -121,6 +147,7 @@
     "cross-env": "^7.0.3",
     "electron": "^42.2.0",
     "electron-builder": "^26.8.1",
+    "png-to-ico": "^3.0.1",
     "typescript": "^5.9.0",
     "vite": "^6.4.0"
   },
