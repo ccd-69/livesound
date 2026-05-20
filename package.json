@@ -25,11 +25,6 @@
       "output": "dist-installer",
       "buildResources": "build"
     },
-    "files": [
-      "dist/**/*",
-      "package.json",
-      "build/**/*"
-    ],
     "asar": true,
     "win": {
       "icon": "icons/icon.png",
