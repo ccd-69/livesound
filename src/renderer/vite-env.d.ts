@@ -35,5 +35,13 @@ interface Window {
     onMediaPlayPause: (cb: () => void) => () => void;
     onMediaNext: (cb: () => void) => () => void;
     onMediaPrevious: (cb: () => void) => () => void;
+
+    // YouTube Playback
+    youtubeGetStreamUrl: (videoUrl: string) => Promise<{ success: boolean; url?: string; title?: string; thumbnail?: string; error?: string }>;
+    youtubeCreateView: (videoId: string) => Promise<{ success: boolean; error?: string }>;
+    youtubeDestroyView: () => Promise<void>;
+    youtubePlayView: () => Promise<void>;
+    youtubePauseView: () => Promise<void>;
+    youtubeShowView: (show: boolean) => Promise<void>;
   };
 }

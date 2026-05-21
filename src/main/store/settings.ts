@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   volume: 0.8,
   spotifyConnected: false,
   youtubeConnected: false,
+  youtubePlaybackMode: 'iframe' as 'iframe' | 'ytm-web' | 'direct-stream' | 'webview',
 };
 
 export function loadSettings(): Record<string, any> {

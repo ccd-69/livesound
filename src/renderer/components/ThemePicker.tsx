@@ -1,53 +1,38 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { useTheme } from '../themes/ThemeProvider';
 
 export default function ThemePicker() {
   const { preset, setPreset, customAccent, setCustomAccent, presets } = useTheme();
 
   return (
-    <div
-      style={{
-        marginTop: '0.5rem',
-        padding: '0.75rem',
-        background: 'var(--hover-color)',
-        borderRadius: '8px',
-        border: '1px solid var(--border-color)',
-        maxHeight: '200px',
-        overflowY: 'auto',
-      }}
-    >
-      <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-        Select Theme
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+    <div className="mt-2 max-h-[200px] overflow-y-auto rounded-lg border border-border bg-hover p-3">
+      <div className="mb-2 text-xs font-semibold text-muted">Select Theme</div>
+      <div className="flex flex-col gap-1">
         {presets.map((p) => (
-          <button
+          <motion.button
             key={p.name}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setPreset(p.name)}
-            style={{
-              padding: '0.4rem 0.5rem',
-              borderRadius: '6px',
-              border: 'none',
-              background: preset.name === p.name ? 'var(--accent-color)' : 'transparent',
-              color: preset.name === p.name ? '#000' : 'var(--text-color)',
-              cursor: 'pointer',
-              textAlign: 'left',
-              fontSize: '0.8rem',
-              fontWeight: preset.name === p.name ? 600 : 400,
-            }}
+            className={`rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+              preset.name === p.name
+                ? 'bg-accent text-black'
+                : 'bg-transparent text-text hover:bg-hover'
+            }`}
           >
             {p.label}
-          </button>
+          </motion.button>
         ))}
       </div>
       {preset.name === 'custom' && (
-        <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <label style={{ fontSize: '0.75rem' }}>Accent:</label>
+        <div className="mt-2 flex items-center gap-2">
+          <label className="text-xs">Accent:</label>
           <input
             type="color"
             value={customAccent}
             onChange={(e) => setCustomAccent(e.target.value)}
-            style={{ width: '40px', height: '28px', cursor: 'pointer', border: 'none', background: 'none' }}
+            className="h-7 w-10 cursor-pointer border-none bg-transparent"
           />
         </div>
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
 interface SpotifyState {
   ready: boolean;
@@ -41,14 +41,26 @@ export function useSpotifyPlayer() {
   function loadSdk(): Promise<void> {
     return new Promise((resolve) => {
       if (document.getElementById('spotify-sdk')) {
-        resolve();
+        // Already loaded: Spotify object should exist
+        if (window.Spotify) {
+          resolve();
+        } else {
+          // Wait for the SDK callback if script exists but SDK isn't ready yet
+          const existing = window.onSpotifyWebPlaybackSDKReady;
+          window.onSpotifyWebPlaybackSDKReady = () => {
+            existing?.();
+            resolve();
+          };
+        }
         return;
       }
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        resolve();
+      };
       const script = document.createElement('script');
       script.id = 'spotify-sdk';
       script.src = 'https://sdk.scdn.co/spotify-player.js';
       script.async = true;
-      script.onload = () => resolve();
       document.body.appendChild(script);
     });
   }
@@ -136,7 +148,7 @@ export function useSpotifyPlayer() {
     }
   }, [init]);
 
-  return {
+  return useMemo(() => ({
     ...state,
     init,
     togglePlay,
@@ -145,5 +157,5 @@ export function useSpotifyPlayer() {
     seek,
     setVolume,
     playTrack,
-  };
+  }), [state, init, togglePlay, nextTrack, previousTrack, seek, setVolume, playTrack]);
 }

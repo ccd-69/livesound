@@ -1,7 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { usePlayback } from '../hooks/usePlayback';
+import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
+import { usePlayback } from '../hooks/usePlayback';
 import AddToPlaylist from '../components/AddToPlaylist';
+import {
+  Music,
+  Tv,
+  ArrowLeft,
+  Disc3,
+  ListMusic,
+  RefreshCw,
+  Loader2,
+  Unlink,
+} from 'lucide-react';
 
 export default function Library() {
   const playback = usePlayback();
@@ -130,219 +141,308 @@ export default function Library() {
     setSettings(s);
   };
 
-  if (selectedPlaylist) {
-    return (
-      <div>
-        <button onClick={backToLibrary} style={{ ...btnSecondaryStyle, marginBottom: '1rem' }}>← Back</button>
-        <h2 style={{ color: 'var(--accent-color)', marginBottom: '0.5rem' }}>{selectedPlaylist.name}</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-          {selectedPlaylist.trackCount} tracks · {selectedPlaylist.source === 'spotify' ? 'Spotify' : 'YouTube'}
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {tracks.map((t) => (
-            <div
-              key={t.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                transition: 'background 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--hover-color)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              onClick={() => playback.playTrack(t)}
-            >
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '4px',
-                  background: 'var(--hover-color)',
-                  flexShrink: 0,
-                  overflow: 'hidden',
-                }}
-              >
-                {t.image && <img src={t.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.artist}</div>
-              </div>
-              {t.source === 'youtube' && <AddToPlaylist track={t} onAdded={loadData} />}
-            </div>
-          ))}
-          {tracks.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Loading tracks...</p>}
-        </div>
-      </div>
-    );
-  }
-
   const hasAnyConnection = settings.spotifyConnected || settings.youtubeConnected;
 
   return (
-    <div>
-      <h2 style={{ marginBottom: '1rem', color: 'var(--accent-color)' }}>Library</h2>
+    <div className="flex h-full flex-col">
+      <AnimatePresence mode="wait">
+        {selectedPlaylist ? (
+          <PlaylistDetail
+            key="detail"
+            playlist={selectedPlaylist}
+            tracks={tracks}
+            onBack={backToLibrary}
+            playback={playback}
+            loadData={loadData}
+          />
+        ) : (
+          <motion.div
+            key="library"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <h2 className="mb-4 text-2xl font-bold tracking-tight text-accent">Library</h2>
 
-      {!hasAnyConnection && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '400px' }}>
-          <div style={cardStyle}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎵</div>
-            <h3>Connect Spotify</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-              Sign in with Spotify to play music and sync your library. Requires Premium.
-            </p>
-            <button onClick={connectSpotify} disabled={connecting} style={btnPrimaryStyle}>
-              {connecting ? 'Connecting...' : 'Connect Spotify'}
-            </button>
-          </div>
-
-          <div style={cardStyle}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📺</div>
-            <h3>Connect YouTube Music</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-              Sign in with Google to sync your YouTube playlists and liked videos.
-            </p>
-            <button onClick={connectYouTube} disabled={connecting} style={btnPrimaryStyle}>
-              {connecting ? 'Connecting...' : 'Connect YouTube'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {hasAnyConnection && (
-        <>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            {settings.spotifyConnected && (
-              <button onClick={() => disconnect('spotify')} style={btnSecondaryStyle}>Disconnect Spotify</button>
+            {!hasAnyConnection && (
+              <div className="flex max-w-md flex-col gap-4">
+                <ConnectCard
+                  icon={<Music size={28} />}
+                  title="Connect Spotify"
+                  description="Sign in with Spotify to play music and sync your library. Requires Premium."
+                  onConnect={connectSpotify}
+                  connecting={connecting}
+                />
+                <ConnectCard
+                  icon={<Tv size={28} />}
+                  title="Connect YouTube Music"
+                  description="Sign in with Google to sync your YouTube playlists and liked videos."
+                  onConnect={connectYouTube}
+                  connecting={connecting}
+                />
+              </div>
             )}
-            {settings.youtubeConnected && (
-              <button onClick={() => disconnect('youtube')} style={btnSecondaryStyle}>Disconnect YouTube</button>
-            )}
-          </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-            <button
-              onClick={() => setTab('playlists')}
-              style={{
-                ...btnSecondaryStyle,
-                background: tab === 'playlists' ? 'var(--accent-color)' : 'transparent',
-                color: tab === 'playlists' ? '#000' : 'var(--text-color)',
-              }}
-            >
-              Playlists ({playlists.length})
-            </button>
-            <button
-              onClick={() => setTab('albums')}
-              style={{
-                ...btnSecondaryStyle,
-                background: tab === 'albums' ? 'var(--accent-color)' : 'transparent',
-                color: tab === 'albums' ? '#000' : 'var(--text-color)',
-              }}
-            >
-              Albums ({albums.length})
-            </button>
-          </div>
+            {hasAnyConnection && (
+              <>
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  {settings.spotifyConnected && (
+                    <ActionButton onClick={() => disconnect('spotify')} icon={<Unlink size={14} />}>
+                      Disconnect Spotify
+                    </ActionButton>
+                  )}
+                  {settings.youtubeConnected && (
+                    <ActionButton onClick={() => disconnect('youtube')} icon={<Unlink size={14} />}>
+                      Disconnect YouTube
+                    </ActionButton>
+                  )}
+                  <ActionButton onClick={syncSpotify} icon={syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}>
+                    {syncing ? 'Syncing...' : 'Sync'}
+                  </ActionButton>
+                </div>
 
-          {tab === 'playlists' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
-              {[...playlists].sort((a, b) => {
-                const aTime = a.createdAt || 0;
-                const bTime = b.createdAt || 0;
-                return bTime - aTime;
-              }).map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => openPlaylist(p)}
-                  style={{
-                    cursor: 'pointer',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    background: 'var(--card-color)',
-                    border: '1px solid var(--border-color)',
-                    transition: 'transform 0.2s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                >
-                  <div style={{ aspectRatio: '1', background: 'var(--hover-color)', overflow: 'hidden' }}>
-                    {p.image ? (
-                      <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-muted)' }}>🎵</div>
+                <div className="mb-4 flex gap-2">
+                  <TabButton active={tab === 'playlists'} onClick={() => setTab('playlists')} icon={<ListMusic size={16} />}>
+                    Playlists ({playlists.length})
+                  </TabButton>
+                  <TabButton active={tab === 'albums'} onClick={() => setTab('albums')} icon={<Disc3 size={16} />}>
+                    Albums ({albums.length})
+                  </TabButton>
+                </div>
+
+                {tab === 'playlists' && (
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
+                    {[...playlists]
+                      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+                      .map((p) => (
+                        <PlaylistCard key={p.id} playlist={p} onClick={() => openPlaylist(p)} />
+                      ))}
+                    {playlists.length === 0 && (
+                      <p className="col-span-full text-sm text-muted">
+                        No playlists yet. Sync a service to load your library.
+                      </p>
                     )}
                   </div>
-                  <div style={{ padding: '0.5rem' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {p.owner} · {p.source === 'spotify' ? 'Spotify' : 'YouTube'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {playlists.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No playlists yet. Sync a service to load your library.</p>}
-            </div>
-          )}
+                )}
 
-          {tab === 'albums' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
-              {albums.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    background: 'var(--card-color)',
-                    border: '1px solid var(--border-color)',
-                  }}
-                >
-                  <div style={{ aspectRatio: '1', background: 'var(--hover-color)', overflow: 'hidden' }}>
-                    {a.image ? (
-                      <img src={a.image} alt={a.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-muted)' }}>💿</div>
+                {tab === 'albums' && (
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
+                    {albums.map((a) => (
+                      <AlbumCard key={a.id} album={a} />
+                    ))}
+                    {albums.length === 0 && (
+                      <p className="col-span-full text-sm text-muted">No albums yet. Sync Spotify to load your saved albums.</p>
                     )}
                   </div>
-                  <div style={{ padding: '0.5rem' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{a.artist}</div>
-                  </div>
-                </div>
-              ))}
-              {albums.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No albums yet. Sync Spotify to load your saved albums.</p>}
-            </div>
-          )}
-        </>
-      )}
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-const cardStyle: React.CSSProperties = {
-  background: 'var(--card-color)',
-  border: '1px solid var(--border-color)',
-  borderRadius: '12px',
-  padding: '2rem',
-  textAlign: 'center',
-};
+function PlaylistCard({ playlist, onClick }: { playlist: any; onClick: () => void }) {
+  return (
+    <motion.div
+      whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      onClick={onClick}
+      className="cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-lg"
+    >
+      <div className="aspect-square bg-hover overflow-hidden">
+        {playlist.image ? (
+          <img src={playlist.image} alt={playlist.name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="grid h-full place-items-center text-muted">
+            <Music size={32} />
+          </div>
+        )}
+      </div>
+      <div className="p-2">
+        <div className="truncate text-sm font-semibold">{playlist.name}</div>
+        <div className="truncate text-xs text-muted">
+          {playlist.owner} · {playlist.source === 'spotify' ? 'Spotify' : 'YouTube'}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
-const btnPrimaryStyle: React.CSSProperties = {
-  padding: '0.6rem 1.5rem',
-  borderRadius: '8px',
-  border: 'none',
-  background: 'var(--accent-color)',
-  color: '#000',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
+function AlbumCard({ album }: { album: any }) {
+  return (
+    <motion.div
+      whileHover={{ y: -4, scale: 1.02 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      className="overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-lg"
+    >
+      <div className="aspect-square bg-hover overflow-hidden">
+        {album.image ? (
+          <img src={album.image} alt={album.name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="grid h-full place-items-center text-muted">
+            <Disc3 size={32} />
+          </div>
+        )}
+      </div>
+      <div className="p-2">
+        <div className="truncate text-sm font-semibold">{album.name}</div>
+        <div className="truncate text-xs text-muted">{album.artist}</div>
+      </div>
+    </motion.div>
+  );
+}
 
-const btnSecondaryStyle: React.CSSProperties = {
-  padding: '0.5rem 1rem',
-  borderRadius: '6px',
-  border: '1px solid var(--border-color)',
-  background: 'transparent',
-  color: 'var(--text-color)',
-  cursor: 'pointer',
-};
+function PlaylistDetail({
+  playlist,
+  tracks,
+  onBack,
+  playback,
+  loadData,
+}: {
+  playlist: any;
+  tracks: any[];
+  onBack: () => void;
+  playback: ReturnType<typeof usePlayback>;
+  loadData: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.2 }}
+    >
+      <button
+        onClick={onBack}
+        className="mb-4 flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-text transition-colors hover:bg-hover"
+      >
+        <ArrowLeft size={16} /> Back
+      </button>
+
+      <h2 className="mb-1 text-xl font-bold text-accent">{playlist.name}</h2>
+      <p className="mb-4 text-sm text-muted">
+        {playlist.trackCount} tracks · {playlist.source === 'spotify' ? 'Spotify' : 'YouTube'}
+      </p>
+
+      <div className="flex flex-col gap-1">
+        {tracks.map((t, i) => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.03, duration: 0.2 }}
+            onClick={() => playback.playTrack(t)}
+            className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-hover"
+          >
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-hover">
+              {t.image && <img src={t.image} alt="" className="h-full w-full object-cover" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{t.name}</div>
+              <div className="truncate text-xs text-muted">{t.artist}</div>
+            </div>
+            {t.source === 'youtube' && <AddToPlaylist track={t} onAdded={loadData} />}
+          </motion.div>
+        ))}
+        {tracks.length === 0 && <p className="text-sm text-muted">Loading tracks...</p>}
+      </div>
+    </motion.div>
+  );
+}
+
+function ConnectCard({
+  icon,
+  title,
+  description,
+  onConnect,
+  connecting,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onConnect: () => void;
+  connecting: boolean;
+}) {
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      className="rounded-2xl border border-border bg-card p-6 text-center transition-shadow hover:shadow-lg"
+    >
+      <div className="mb-3 inline-flex items-center justify-center rounded-full bg-hover p-3 text-accent">
+        {icon}
+      </div>
+      <h3 className="mb-2 text-lg font-semibold">{title}</h3>
+      <p className="mb-4 text-sm text-muted">{description}</p>
+      <motion.button
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onConnect}
+        disabled={connecting}
+        className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+      >
+        {connecting ? (
+          <span className="flex items-center gap-2">
+            <Loader2 size={16} className="animate-spin" /> Connecting...
+          </span>
+        ) : (
+          `Connect ${title.split(' ')[1]}`
+        )}
+      </motion.button>
+    </motion.div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  icon: React.ReactNode;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? 'border-accent bg-accent text-black'
+          : 'border-border bg-transparent text-text hover:bg-hover'
+      }`}
+    >
+      {icon}
+      {children}
+    </motion.button>
+  );
+}
+
+function ActionButton({
+  onClick,
+  children,
+  icon,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+  icon: React.ReactNode;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className="flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3 py-1.5 text-xs text-text transition-colors hover:bg-hover"
+    >
+      {icon}
+      {children}
+    </motion.button>
+  );
+}

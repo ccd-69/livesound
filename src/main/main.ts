@@ -1,6 +1,15 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net } from 'electron';
+import http from 'http';
+import fs from 'fs';
+import {
+  cleanupTempFiles,
+  clearCacheOnUpdate,
+  createStartupTimer,
+  managePowerState,
+  auditProcesses,
+} from '@yawlabs/electron-optimize';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { loadSettings, saveSettings } from './store/settings.js';
 import * as spotify from './auth/spotify.js';
 import * as youtube from './auth/youtube.js';
@@ -9,13 +18,103 @@ import * as youtubeApi from './api/youtube.js';
 import * as cache from './db/cache.js';
 import * as updater from './updater.js';
 
+// Dynamic import for youtube-dl-exec (ESM)
+let youtubedl: any = null;
+async function getYoutubeDl() {
+  if (!youtubedl) {
+    const mod = await import('youtube-dl-exec');
+    youtubedl = mod.default || mod;
+  }
+  return youtubedl;
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const isDev = !app.isPackaged;
+const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let ytmView: WebContentsView | null = null;
 
-function createWindow() {
+function destroyYtmView() {
+  if (ytmView) {
+    try {
+      mainWindow?.contentView.removeChildView(ytmView);
+      (ytmView.webContents as any).destroy?.();
+    } catch {}
+    ytmView = null;
+  }
+}
+
+function destroyTray() {
+  if (tray) {
+    try {
+      tray.destroy();
+    } catch {}
+    tray = null;
+  }
+}
+
+let staticServerPort = 0;
+
+function startStaticServer(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const rendererDir = path.join(import.meta.dirname, '../renderer');
+    const server = http.createServer((req, res) => {
+      const reqPath = req.url?.split('?')[0] || '/';
+      let filePath = path.join(rendererDir, reqPath === '/' ? 'index.html' : reqPath);
+
+      // Prevent directory traversal
+      if (!filePath.startsWith(rendererDir)) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          // SPA fallback: serve index.html for any non-file path
+          fs.readFile(path.join(rendererDir, 'index.html'), (err2, data2) => {
+            if (err2) {
+              res.writeHead(404);
+              res.end();
+              return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(data2);
+          });
+          return;
+        }
+
+        const ext = path.extname(filePath);
+        const mimeTypes: Record<string, string> = {
+          '.html': 'text/html',
+          '.js': 'application/javascript',
+          '.css': 'text/css',
+          '.json': 'application/json',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.ico': 'image/x-icon',
+        };
+        res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+        res.end(data);
+      });
+    });
+
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      const port = typeof addr === 'string' ? 0 : addr?.port ?? 0;
+      staticServerPort = port;
+      console.log(`[StaticServer] Serving renderer at http://127.0.0.1:${port}`);
+      resolve(port);
+    });
+
+    server.on('error', reject);
+  });
+}
+
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -26,6 +125,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       preload: path.join(import.meta.dirname, 'preload.js'),
+      webviewTag: true,
     },
   });
 
@@ -36,11 +136,24 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173/');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(import.meta.dirname, '../renderer/index.html'));
+    await mainWindow.loadURL(`http://127.0.0.1:${staticServerPort}`);
   }
 
   mainWindow.on('closed', () => {
+    destroyYtmView();
     mainWindow = null;
+  });
+
+  // Resize YouTube Music view when window resizes
+  mainWindow.on('resize', () => {
+    if (!mainWindow || !ytmView) return;
+    const bounds = mainWindow.getContentBounds();
+    ytmView.setBounds({
+      x: 240,
+      y: 32,
+      width: bounds.width - 240,
+      height: bounds.height - 32 - 80,
+    });
   });
 
   // Minimize to tray on close for all platforms
@@ -155,7 +268,8 @@ function createTray() {
     {
       label: 'Quit',
       click: () => {
-        tray?.destroy();
+        destroyYtmView();
+        destroyTray();
         app.quit();
       },
     },
@@ -178,7 +292,38 @@ function createTray() {
   });
 }
 
-app.whenReady().then(() => {
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true,
+    },
+  },
+]);
+
+const timer = createStartupTimer();
+
+app.whenReady().then(async () => {
+  timer.mark('app-ready');
+
+  // Clean up stale Chromium temp files
+  const removed = cleanupTempFiles(app.getPath('userData'));
+  if (removed > 0) console.log(`[Optimize] Cleaned ${removed} temp files`);
+
+  // Clear caches if the app was updated since last run
+  const cacheResult = await clearCacheOnUpdate(
+    app.getPath('userData'),
+    app.getVersion(),
+    session.defaultSession as any,
+  );
+  if (cacheResult.versionChanged) {
+    console.log(`[Optimize] Updated ${cacheResult.previousVersion} -> ${cacheResult.currentVersion}, caches cleared`);
+  }
+
   // Restore saved credentials into auth modules on startup
   const startupSettings = loadSettings();
   if (startupSettings.spotifyClientId) {
@@ -188,8 +333,29 @@ app.whenReady().then(() => {
     youtube.setClientCredentials(startupSettings.youtubeClientId, startupSettings.youtubeClientSecret);
   }
 
-  createWindow();
+  // Start a local HTTP server to serve renderer files in production.
+  // A real http://localhost origin gives the YouTube iframe a valid Referer
+  // header, which is required to avoid Error 153.
+  if (!isDev) {
+    await startStaticServer();
+  }
+
+  await createWindow();
+  timer.mark('window-created');
   createTray();
+
+  if (mainWindow) {
+    mainWindow.once('ready-to-show', () => {
+      timer.mark('ready-to-show');
+      timer.flush();
+    });
+  }
+
+  // Log process audit once, 10s after startup
+  setTimeout(() => {
+    const audit = auditProcesses(app);
+    console.log(`[Optimize] Total memory: ${audit.totalMemoryFormatted} across ${audit.processes.length} processes`);
+  }, 10000);
 
   // Wire up auto-updater and check silently on launch (skip in dev)
   if (mainWindow && !isDev) {
@@ -238,39 +404,64 @@ app.whenReady().then(() => {
   });
 
   // Periodic background sync every 5 minutes
-  setInterval(async () => {
-    if (youtube.isAuthenticated()) {
-      try {
-        const playlists = await youtubeApi.getMyPlaylists();
-        cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'youtube' })), 'youtube');
-      } catch {
-        // ignore
+  let pollingTimer: ReturnType<typeof setInterval> | null = null;
+  function startPolling() {
+    if (pollingTimer) return;
+    pollingTimer = setInterval(async () => {
+      if (youtube.isAuthenticated()) {
+        try {
+          const playlists = await youtubeApi.getMyPlaylists();
+          cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'youtube' })), 'youtube');
+        } catch {
+          // ignore
+        }
       }
-    }
-    if (spotify.isAuthenticated()) {
-      try {
-        const [playlists, albums] = await Promise.all([
-          spotifyApi.getMyPlaylists(),
-          spotifyApi.getSavedAlbums(),
-        ]);
-        cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'spotify' })), 'spotify');
-        cache.saveAlbums(albums.map((a) => ({ ...a, source: 'spotify' })), 'spotify');
-      } catch {
-        // ignore
+      if (spotify.isAuthenticated()) {
+        try {
+          const [playlists, albums] = await Promise.all([
+            spotifyApi.getMyPlaylists(),
+            spotifyApi.getSavedAlbums(),
+          ]);
+          cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'spotify' })), 'spotify');
+          cache.saveAlbums(albums.map((a) => ({ ...a, source: 'spotify' })), 'spotify');
+        } catch {
+          // ignore
+        }
       }
-    }
-  }, 300000);
+    }, 300000);
+  }
+  startPolling();
+
+  // Pause polling during sleep/resume to avoid CPU spikes and failed requests
+  const cleanupPower = managePowerState(powerMonitor, {
+    onSuspend() {
+      if (pollingTimer) {
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+      }
+    },
+    onResume() {
+      startPolling();
+    },
+  });
+  app.on('before-quit', cleanupPower);
 });
 
 app.on('window-all-closed', () => {
   globalShortcut.unregisterAll();
-  if (process.platform !== 'darwin') {
-    // On Windows/Linux we keep tray running; user quits via tray menu
+  destroyYtmView();
+  if (isDev || process.platform !== 'darwin') {
+    // In dev mode, quit immediately so leftover processes don't accumulate
+    // On Windows/Linux quit when all windows are closed
+    destroyTray();
+    app.quit();
   }
 });
 
 app.on('before-quit', () => {
   globalShortcut.unregisterAll();
+  destroyYtmView();
+  destroyTray();
 });
 
 // Settings IPC
@@ -483,9 +674,116 @@ ipcMain.handle('maximize-window', () => {
 });
 
 ipcMain.handle('close-window', () => {
-  mainWindow?.close();
+  if (isDev) {
+    // In dev mode, fully quit so we don't accumulate ghost processes
+    destroyYtmView();
+    destroyTray();
+    app.quit();
+  } else {
+    mainWindow?.close();
+  }
 });
 
 ipcMain.handle('is-window-maximized', () => {
   return mainWindow?.isMaximized() ?? false;
 });
+
+// YouTube Playback IPC
+ipcMain.handle('youtube-get-stream-url', async (_event, videoUrl: string) => {
+  try {
+    const ydl = await getYoutubeDl();
+    const result = await ydl(videoUrl, {
+      dumpSingleJson: true,
+      noCheckCertificates: true,
+      noWarnings: true,
+    });
+
+    // Prefer audio-only formats, fallback to any format with audio
+    const audioFormat = result.formats?.find(
+      (f: any) => f.vcodec === 'none' && f.acodec !== 'none'
+    ) || result.formats?.find((f: any) => f.acodec !== 'none') || result.formats?.[0];
+
+    return {
+      success: true,
+      url: audioFormat?.url || result.url,
+      title: result.title,
+      thumbnail: result.thumbnail,
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('youtube-create-view', (_event, videoId: string) => {
+  if (!mainWindow) return { success: false, error: 'No window' };
+
+  // Destroy existing view if any
+  if (ytmView) {
+    mainWindow.contentView.removeChildView(ytmView);
+    (ytmView.webContents as any).destroy?.();
+    ytmView = null;
+  }
+
+  ytmView = new WebContentsView({
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+
+  // Attach to window FIRST (critical fix from ytmdesktop PR #1661)
+  mainWindow.contentView.addChildView(ytmView);
+
+  // Position over the content area (right of sidebar, below title bar, above player bar)
+  const bounds = mainWindow.getBounds();
+  ytmView.setBounds({
+    x: 240,
+    y: 32,
+    width: bounds.width - 240,
+    height: bounds.height - 32 - 80, // title bar + player bar
+  });
+
+  // Then load URL
+  ytmView.webContents.loadURL(`https://music.youtube.com/watch?v=${videoId}`);
+
+  return { success: true };
+});
+
+ipcMain.handle('youtube-destroy-view', () => {
+  if (!mainWindow || !ytmView) return;
+  mainWindow.contentView.removeChildView(ytmView);
+  (ytmView.webContents as any).destroy?.();
+  ytmView = null;
+});
+
+ipcMain.handle('youtube-play-view', () => {
+  if (!ytmView) return;
+  ytmView.webContents.executeJavaScript(`
+    const video = document.querySelector('video');
+    if (video) video.play();
+  `).catch(() => {});
+});
+
+ipcMain.handle('youtube-pause-view', () => {
+  if (!ytmView) return;
+  ytmView.webContents.executeJavaScript(`
+    const video = document.querySelector('video');
+    if (video) video.pause();
+  `).catch(() => {});
+});
+
+ipcMain.handle('youtube-show-view', (_event, show: boolean) => {
+  if (!mainWindow || !ytmView) return;
+  const bounds = mainWindow.getBounds();
+  if (show) {
+    ytmView.setBounds({
+      x: 240,
+      y: 32,
+      width: bounds.width - 240,
+      height: bounds.height - 32 - 80,
+    });
+  } else {
+    ytmView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+  }
+});
+

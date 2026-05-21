@@ -1,72 +1,83 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
+import { Library, Search, Settings, Palette } from 'lucide-react';
 import ThemePicker from './ThemePicker';
 
 const navItems = [
-  { to: '/', label: 'Library', icon: '🎵' },
-  { to: '/search', label: 'Search', icon: '🔍' },
-  { to: '/settings', label: 'Settings', icon: '⚙️' },
+  { to: '/', label: 'Library', icon: Library },
+  { to: '/search', label: 'Search', icon: Search },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Sidebar() {
   const [showThemes, setShowThemes] = useState(false);
+  const location = useLocation();
 
   return (
-    <aside
-      style={{
-        background: 'var(--card-color)',
-        borderRight: '1px solid var(--border-color)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '1rem',
-        gap: '0.5rem',
-        height: '100%',
-      }}
-    >
-      <div style={{ fontSize: '1.25rem', fontWeight: 700, padding: '0.5rem 0 1rem', color: 'var(--accent-color)' }}>
+    <div className="flex h-full flex-col glass p-4 gap-1">
+      <div className="px-2 pb-4 pt-1 text-lg font-bold tracking-tight text-accent">
         LiveSound
       </div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            style={({ isActive }) => ({
-              padding: '0.6rem 0.75rem',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              color: isActive ? 'var(--accent-color)' : 'var(--text-color)',
-              background: isActive ? 'var(--hover-color)' : 'transparent',
-              fontWeight: isActive ? 600 : 400,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'background 0.2s',
-            })}
-          >
-            <span>{item.icon}</span>
-            {item.label}
-          </NavLink>
-        ))}
+      <nav className="flex flex-1 flex-col gap-1">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.to;
+          return (
+            <motion.div
+              key={item.to}
+              whileHover={{ x: 2 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            >
+              <NavLink
+                to={item.to}
+                className={({ isActive }) =>
+                  `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
+                    isActive
+                      ? 'text-accent'
+                      : 'text-text hover:bg-hover'
+                  }`
+                }
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="sidebar-active"
+                    className="absolute inset-0 rounded-lg bg-hover"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">
+                  <Icon size={18} />
+                </span>
+                <span className="relative z-10">{item.label}</span>
+              </NavLink>
+            </motion.div>
+          );
+        })}
       </nav>
 
       <button
         onClick={() => setShowThemes(!showThemes)}
-        style={{
-          padding: '0.6rem 0.75rem',
-          borderRadius: '8px',
-          border: '1px solid var(--border-color)',
-          background: 'transparent',
-          color: 'var(--text-color)',
-          cursor: 'pointer',
-          textAlign: 'left',
-        }}
+        className="flex items-center gap-3 rounded-lg border border-border bg-transparent px-3 py-2.5 text-sm text-text transition-colors hover:bg-hover"
       >
-        🎨 Themes
+        <Palette size={18} />
+        Themes
       </button>
 
-      {showThemes && <ThemePicker />}
-    </aside>
+      <AnimatePresence>
+        {showThemes && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <ThemePicker />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

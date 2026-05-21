@@ -1,42 +1,44 @@
 import React from 'react';
+import { Outlet } from 'react-router-dom';
+import { motion } from 'motion/react';
 import Sidebar from './Sidebar';
 import PlayerBar from './PlayerBar';
 import TitleBar from './TitleBar';
-import { Outlet } from 'react-router-dom';
+import YouTubeAudioPlayer from './YouTubeAudioPlayer';
+import AutoTestPlayer from './AutoTestPlayer';
 
 export default function Layout() {
   return (
-    <div
+    <div className="grid h-screen w-screen overflow-hidden bg-bg text-text"
       style={{
-        display: 'grid',
         gridTemplateColumns: '240px 1fr',
         gridTemplateRows: 'auto 1fr auto',
-        height: '100vh',
-        width: '100vw',
-        background: 'var(--bg-color)',
-        color: 'var(--text-color)',
-        border: '1px solid var(--border-color)',
       }}
     >
-      <div style={{ gridColumn: '1 / -1', gridRow: '1' }}>
+      <div className="col-span-full row-start-1">
         <TitleBar />
       </div>
-      <div style={{ gridColumn: '1', gridRow: '2', height: '100%', overflow: 'hidden' }}>
+
+      <aside className="row-start-2 h-full overflow-hidden border-r border-border">
         <Sidebar />
-      </div>
-      <main
-        style={{
-          gridColumn: '2',
-          gridRow: '2',
-          overflow: 'auto',
-          padding: '1.5rem',
-        }}
+      </aside>
+
+      <motion.main
+        key={location.pathname}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="row-start-2 overflow-auto p-6"
       >
         <Outlet />
-      </main>
-      <div style={{ gridColumn: '1 / -1', gridRow: '3' }}>
+      </motion.main>
+
+      <div className="col-span-full row-start-3 border-t border-border">
         <PlayerBar />
       </div>
+
+      {/* Hidden YouTube audio player so audio plays regardless of route */}
+      <YouTubeAudioPlayer />
     </div>
   );
 }

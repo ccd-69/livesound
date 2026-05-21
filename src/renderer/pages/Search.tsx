@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { usePlayback } from '../hooks/usePlayback';
 import AddToPlaylist from '../components/AddToPlaylist';
+import {
+  Search as SearchIcon,
+  Loader2,
+  Music,
+  Disc3,
+  ListMusic,
+  Disc,
+} from 'lucide-react';
 
 export default function Search() {
   const playback = usePlayback();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<{ tracks: any[]; albums: any[]; playlists: any[] }>({
-    tracks: [],
-    albums: [],
-    playlists: [],
-  });
+  const [results, setResults] = useState<{
+    tracks: any[];
+    albums: any[];
+    playlists: any[];
+  }>({ tracks: [], albums: [], playlists: [] });
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState<'tracks' | 'albums' | 'playlists'>('tracks');
@@ -40,164 +49,192 @@ export default function Search() {
   const hasConnection = settings.spotifyConnected || settings.youtubeConnected;
 
   return (
-    <div>
-      <h2 style={{ marginBottom: '1rem', color: 'var(--accent-color)' }}>Search</h2>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
+      <h2 className="mb-4 text-2xl font-bold tracking-tight text-accent">Search</h2>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Search tracks, albums, artists, or paste a YouTube URL..."
-          disabled={!hasConnection}
-          style={{
-            flex: 1,
-            padding: '0.6rem 0.75rem',
-            borderRadius: '8px',
-            border: '1px solid var(--border-color)',
-            background: 'var(--card-color)',
-            color: 'var(--text-color)',
-            fontSize: '1rem',
-            outline: 'none',
-            opacity: hasConnection ? 1 : 0.5,
-          }}
-        />
-        <button
+      <div className="mb-3 flex gap-2">
+        <div className="relative flex-1">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Search tracks, albums, artists, or paste a YouTube URL..."
+            disabled={!hasConnection}
+            className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-text outline-none transition-colors placeholder:text-muted focus:border-accent disabled:opacity-50"
+          />
+        </div>
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
           onClick={handleSearch}
           disabled={!hasConnection || loading}
-          style={{
-            padding: '0.6rem 1rem',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'var(--accent-color)',
-            color: '#000',
-            fontWeight: 600,
-            cursor: 'pointer',
-            opacity: hasConnection ? 1 : 0.5,
-          }}
+          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {loading ? '...' : 'Search'}
-        </button>
+          {loading ? <Loader2 size={18} className="animate-spin" /> : 'Search'}
+        </motion.button>
       </div>
 
       {settings.youtubeConnected && (
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '1rem',
-            fontSize: '0.85rem',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            userSelect: 'none',
-          }}
-        >
+        <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-muted">
           <input
             type="checkbox"
             checked={musicOnly}
             onChange={(e) => setMusicOnly(e.target.checked)}
-            style={{ accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+            className="accent-accent cursor-pointer"
           />
           Music videos only
         </label>
       )}
 
       {!hasConnection && (
-        <p style={{ color: 'var(--text-muted)' }}>Connect Spotify or YouTube Music in the Library to enable search.</p>
+        <p className="text-sm text-muted">Connect Spotify or YouTube Music in the Library to enable search.</p>
       )}
 
-      {totalCount > 0 && (
-        <>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-            {['tracks', 'albums', 'playlists'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                style={{
-                  padding: '0.4rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color)',
-                  background: activeTab === tab ? 'var(--accent-color)' : 'transparent',
-                  color: activeTab === tab ? '#000' : 'var(--text-color)',
-                  cursor: 'pointer',
-                  fontWeight: activeTab === tab ? 600 : 400,
-                }}
-              >
-                {tab[0].toUpperCase() + tab.slice(1)} ({results[tab as keyof typeof results].length})
-              </button>
-            ))}
-          </div>
-
-          {activeTab === 'tracks' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {results.tracks.map((t) => (
-                <div
-                  key={`${t.source}-${t.id}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.5rem',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--hover-color)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  onClick={() => playback.playTrack(t)}
+      <AnimatePresence>
+        {totalCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="mb-3 flex gap-2">
+              {(['tracks', 'albums', 'playlists'] as const).map((tab) => (
+                <TabChip
+                  key={tab}
+                  active={activeTab === tab}
+                  onClick={() => setActiveTab(tab)}
+                  count={results[tab].length}
+                  icon={
+                    tab === 'tracks' ? <Music size={14} /> : tab === 'albums' ? <Disc3 size={14} /> : <ListMusic size={14} />
+                  }
                 >
-                  <div style={{ width: '40px', height: '40px', borderRadius: '4px', background: 'var(--hover-color)', flexShrink: 0, overflow: 'hidden' }}>
-                    {t.image && <img src={t.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {t.artist} · {t.source === 'spotify' ? 'Spotify' : 'YouTube'}
+                  {tab[0].toUpperCase() + tab.slice(1)}
+                </TabChip>
+              ))}
+            </div>
+
+            {activeTab === 'tracks' && (
+              <div className="flex flex-col gap-1">
+                {results.tracks.map((t, i) => (
+                  <motion.div
+                    key={`${t.source}-${t.id}`}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.02, duration: 0.2 }}
+                    onClick={() => playback.playTrack(t)}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-hover"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-hover">
+                      {t.image ? (
+                        <img src={t.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Disc size={18} className="text-muted" />
+                      )}
                     </div>
-                  </div>
-                  {t.source === 'youtube' && <AddToPlaylist track={t} />}
-                </div>
-              ))}
-              {results.tracks.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No tracks found.</p>}
-            </div>
-          )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{t.name}</div>
+                      <div className="truncate text-xs text-muted">
+                        {t.artist} · {t.source === 'spotify' ? 'Spotify' : 'YouTube'}
+                      </div>
+                    </div>
+                    {t.source === 'youtube' && <AddToPlaylist track={t} />}
+                  </motion.div>
+                ))}
+                {results.tracks.length === 0 && <p className="text-sm text-muted">No tracks found.</p>}
+              </div>
+            )}
 
-          {activeTab === 'albums' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
-              {results.albums.map((a) => (
-                <div key={`${a.source}-${a.id}`} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-                  <div style={{ aspectRatio: '1', background: 'var(--hover-color)', overflow: 'hidden' }}>
-                    {a.image ? <img src={a.image} alt={a.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-muted)' }}>💿</div>}
-                  </div>
-                  <div style={{ padding: '0.5rem' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{a.artist}</div>
-                  </div>
-                </div>
-              ))}
-              {results.albums.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No albums found.</p>}
-            </div>
-          )}
+            {activeTab === 'albums' && (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
+                {results.albums.map((a) => (
+                  <motion.div
+                    key={`${a.source}-${a.id}`}
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    className="overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-lg"
+                  >
+                    <div className="aspect-square bg-hover overflow-hidden">
+                      {a.image ? (
+                        <img src={a.image} alt={a.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full place-items-center text-muted">
+                          <Disc3 size={32} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <div className="truncate text-sm font-semibold">{a.name}</div>
+                      <div className="truncate text-xs text-muted">{a.artist}</div>
+                    </div>
+                  </motion.div>
+                ))}
+                {results.albums.length === 0 && <p className="col-span-full text-sm text-muted">No albums found.</p>}
+              </div>
+            )}
 
-          {activeTab === 'playlists' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
-              {results.playlists.map((p) => (
-                <div key={`${p.source}-${p.id}`} style={{ background: 'var(--card-color)', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-                  <div style={{ aspectRatio: '1', background: 'var(--hover-color)', overflow: 'hidden' }}>
-                    {p.image ? <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-muted)' }}>🎵</div>}
-                  </div>
-                  <div style={{ padding: '0.5rem' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.owner} · {p.source === 'spotify' ? 'Spotify' : 'YouTube'}</div>
-                  </div>
-                </div>
-              ))}
-              {results.playlists.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No playlists found.</p>}
-            </div>
-          )}
-        </>
-      )}
-    </div>
+            {activeTab === 'playlists' && (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
+                {results.playlists.map((p) => (
+                  <motion.div
+                    key={`${p.source}-${p.id}`}
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    className="overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-lg"
+                  >
+                    <div className="aspect-square bg-hover overflow-hidden">
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full place-items-center text-muted">
+                          <ListMusic size={32} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <div className="truncate text-sm font-semibold">{p.name}</div>
+                      <div className="truncate text-xs text-muted">
+                        {p.owner} · {p.source === 'spotify' ? 'Spotify' : 'YouTube'}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+                {results.playlists.length === 0 && <p className="col-span-full text-sm text-muted">No playlists found.</p>}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function TabChip({
+  active,
+  onClick,
+  children,
+  count,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  count: number;
+  icon: React.ReactNode;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? 'border-accent bg-accent text-black'
+          : 'border-border bg-transparent text-text hover:bg-hover'
+      }`}
+    >
+      {icon}
+      {children} ({count})
+    </motion.button>
   );
 }

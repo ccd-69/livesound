@@ -1,4 +1,6 @@
-import { autoUpdater } from 'electron-updater';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
 import { BrowserWindow } from 'electron';
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'not-available' | 'downloaded' | 'error';

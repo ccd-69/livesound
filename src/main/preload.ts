@@ -35,6 +35,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // External links
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
 
+  // YouTube Playback
+  youtubeGetStreamUrl: (videoUrl: string) => ipcRenderer.invoke('youtube-get-stream-url', videoUrl),
+  youtubeCreateView: (videoId: string) => ipcRenderer.invoke('youtube-create-view', videoId),
+  youtubeDestroyView: () => ipcRenderer.invoke('youtube-destroy-view'),
+  youtubePlayView: () => ipcRenderer.invoke('youtube-play-view'),
+  youtubePauseView: () => ipcRenderer.invoke('youtube-pause-view'),
+  youtubeShowView: (show: boolean) => ipcRenderer.invoke('youtube-show-view', show),
+
   // Cache
   clearCache: () => ipcRenderer.invoke('clear-cache'),
 
