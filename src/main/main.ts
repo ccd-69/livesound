@@ -102,11 +102,11 @@ function startStaticServer(): Promise<number> {
       });
     });
 
-    server.listen(0, '127.0.0.1', () => {
+    server.listen(0, 'localhost', () => {
       const addr = server.address();
       const port = typeof addr === 'string' ? 0 : addr?.port ?? 0;
       staticServerPort = port;
-      console.log(`[StaticServer] Serving renderer at http://127.0.0.1:${port}`);
+      console.log(`[StaticServer] Serving renderer at http://localhost:${port}`);
       resolve(port);
     });
 
@@ -136,7 +136,7 @@ async function createWindow() {
     mainWindow.loadURL('http://localhost:5173/');
     mainWindow.webContents.openDevTools();
   } else {
-    await mainWindow.loadURL(`http://127.0.0.1:${staticServerPort}`);
+    await mainWindow.loadURL(`http://localhost:${staticServerPort}`);
   }
 
   mainWindow.on('closed', () => {
