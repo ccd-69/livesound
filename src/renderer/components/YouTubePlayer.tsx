@@ -1,6 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'motion/react';
-import { Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
 
 interface YouTubePlayerProps {
@@ -20,7 +18,6 @@ export default function YouTubePlayer({
   className = '',
 }: YouTubePlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [muted, setMuted] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const playback = usePlayback();
 
@@ -33,6 +30,7 @@ export default function YouTubePlayer({
     params.set('modestbranding', '1');
     params.set('rel', '0');
     params.set('playsinline', '1');
+    params.set('enablejsapi', '1');
     params.set('origin', window.location.origin);
     return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
   }, [videoId]);
@@ -64,28 +62,6 @@ export default function YouTubePlayer({
     };
   }, [videoId, playback.setYoutubeController]);
 
-  const toggleMute = useCallback(() => {
-    const nextMuted = !muted;
-    setMuted(nextMuted);
-    const iframe = iframeRef.current;
-    if (!iframe?.contentWindow) return;
-    if (nextMuted) {
-      iframe.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: 'mute', args: [] }),
-        '*'
-      );
-    } else {
-      iframe.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
-        '*'
-      );
-      iframe.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
-        '*'
-      );
-    }
-  }, [muted]);
-
   if (!videoId) {
     return (
       <div className={`flex items-center justify-center rounded-xl bg-black px-6 py-12 text-muted ${className}`}>
@@ -113,15 +89,6 @@ export default function YouTubePlayer({
         />
       </div>
 
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={toggleMute}
-        className="flex items-center gap-2 rounded-full bg-hover px-4 py-2 text-sm text-text transition-colors hover:bg-accent/20"
-      >
-        {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-        {muted ? 'Click to unmute' : 'Muted'}
-      </motion.button>
     </div>
   );
 }
