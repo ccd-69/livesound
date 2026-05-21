@@ -96,7 +96,7 @@ export default function NowPlaying() {
         </motion.button>
 
         {/* Album Art / YouTube Player */}
-        {playback.isYouTubePlaying ? (
+        {playback.youtubeCurrentTrack ? (
           <>
             {playback.youtubeMode === 'iframe' && playback.youtubeCurrentTrack?.uri && (
               <YouTubePlayer

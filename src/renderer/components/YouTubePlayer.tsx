@@ -20,7 +20,7 @@ export default function YouTubePlayer({
   className = '',
 }: YouTubePlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const playback = usePlayback();
 
@@ -30,7 +30,6 @@ export default function YouTubePlayer({
     if (!videoId) return '';
     const params = new URLSearchParams();
     params.set('autoplay', '1');
-    params.set('mute', '1');
     params.set('modestbranding', '1');
     params.set('rel', '0');
     params.set('playsinline', '1');
