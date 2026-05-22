@@ -135,6 +135,9 @@ export default function YouTubeVideoInfo({ videoId }: YouTubeVideoInfoProps) {
 
   return (
     <div className="w-full flex flex-col gap-3 text-text">
+      {/* Title */}
+      <p className="text-base font-bold text-text leading-snug">{details.title}</p>
+
       {/* Description */}
       <div className="rounded-xl border border-border bg-card px-4 py-3">
         <div className="flex items-center justify-between mb-1">
