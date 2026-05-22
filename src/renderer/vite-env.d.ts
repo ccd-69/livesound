@@ -4,6 +4,7 @@ interface Window {
   electronAPI: {
     getAppVersion: () => Promise<string>;
     getAppPid: () => Promise<number>;
+    getRendererPid: () => Promise<number>;
     getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
     checkForUpdates: () => Promise<void>;
     downloadUpdate: () => Promise<void>;

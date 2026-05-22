@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
 import { useAudioAnalyser } from '../hooks/useAudioAnalyser';
-import { getAnalyser } from '../lib/audioAnalyser';
+import { getAnalyser, getSampleRate } from '../lib/audioAnalyser';
 
 interface AudioVisualizerProps {
   barCount?: number;
@@ -96,7 +96,7 @@ export default function AudioVisualizer({
         if (ready && analyser) {
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           analyser.getByteFrequencyData(dataArray);
-          setHeights(addBassVibe(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate), barCount));
+          setHeights(addBassVibe(mapFrequencyToBarsLog(dataArray, barCount, getSampleRate()), barCount));
         } else {
           setHeights(generateBarHeights(barCount, true));
         }
@@ -160,7 +160,7 @@ export function SpectrumAnalyzer({
         if (ready && analyser) {
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           analyser.getByteFrequencyData(dataArray);
-          setHeights(addBassVibe(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate), barCount));
+          setHeights(addBassVibe(mapFrequencyToBarsLog(dataArray, barCount, getSampleRate()), barCount));
         } else {
           setHeights(generateBarHeights(barCount, true));
         }

@@ -272,7 +272,7 @@ export async function startAuth(): Promise<void> {
     },
   });
 
-  // Allow the self-signed certificate for localhost redirect
+  // Allow the self-signed certificate for localhost redirect URLs (may include query params)
   win.webContents.on('certificate-error', (event, urlStr, _error, _certificate, callback) => {
     const parsed = new URL(urlStr);
     if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {

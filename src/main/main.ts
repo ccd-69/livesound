@@ -185,6 +185,20 @@ async function createWindow() {
     await mainWindow.loadURL(`http://localhost:${staticServerPort}`);
   }
 
+  // Security: block new-window / auxclick navigation to untrusted origins
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = ['http://localhost:', 'https://localhost:'];
+    if (!allowed.some((prefix) => url.startsWith(prefix))) {
+      event.preventDefault();
+    }
+  });
+
+  // Security: restrict permission requests (e.g. openExternal) from renderer
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'fullscreen');
+  });
+
   mainWindow.on('closed', () => {
     destroyYtmView();
     stopAudioCapture();
@@ -685,9 +699,16 @@ ipcMain.handle('append-playlist', (_event, playlist: any) => {
   cache.appendPlaylist(playlist);
 });
 
-// External links
+// External links — only allow http/https to prevent arbitrary execution
 ipcMain.handle('open-external', (_event, url: string) => {
-  shell.openExternal(url);
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      shell.openExternal(url);
+    }
+  } catch {
+    // invalid URL
+  }
 });
 
 // Cache management
@@ -698,6 +719,19 @@ ipcMain.handle('clear-cache', () => {
 // App info
 ipcMain.handle('get-app-version', () => app.getVersion());
 ipcMain.handle('get-app-pid', () => process.pid);
+ipcMain.handle('get-renderer-pid', () => {
+  // Return the main renderer process PID (where iframe/direct-stream audio plays).
+  // If a ytmView WebContentsView is active, prefer its PID since audio may
+  // be isolated to that renderer process.
+  if (ytmView) {
+    try {
+      return ytmView.webContents.getOSProcessId();
+    } catch {
+      /* fall through */
+    }
+  }
+  return mainWindow?.webContents.getOSProcessId() ?? process.pid;
+});
 
 // Update IPC
 ipcMain.handle('get-update-status', () => updater.getStatus());

@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App info
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getAppPid: () => ipcRenderer.invoke('get-app-pid'),
+  getRendererPid: () => ipcRenderer.invoke('get-renderer-pid'),
 
   // Updates
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
