@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
+import { useAudioAnalyser } from '../hooks/useAudioAnalyser';
+import { getAnalyser } from '../lib/audioAnalyser';
 
 interface AudioVisualizerProps {
   barCount?: number;
@@ -13,12 +15,27 @@ interface AudioVisualizerProps {
 function generateBarHeights(count: number, isPlaying: boolean): number[] {
   return Array.from({ length: count }, (_, i) => {
     if (!isPlaying) return 0.1 + Math.random() * 0.05;
-    // Create a bell-curve-like distribution for a more natural look
     const center = count / 2;
     const distFromCenter = Math.abs(i - center) / center;
     const base = 0.2 + (1 - distFromCenter) * 0.6;
     return base * (0.5 + Math.random() * 0.5);
   });
+}
+
+function mapFrequencyToBars(freqData: Uint8Array, barCount: number): number[] {
+  const bars: number[] = [];
+  const binsPerBar = Math.max(1, Math.floor(freqData.length / barCount));
+  for (let i = 0; i < barCount; i++) {
+    let sum = 0;
+    for (let j = 0; j < binsPerBar; j++) {
+      const idx = i * binsPerBar + j;
+      if (idx < freqData.length) {
+        sum += freqData[idx];
+      }
+    }
+    bars.push((sum / binsPerBar) / 255);
+  }
+  return bars;
 }
 
 export default function AudioVisualizer({
@@ -30,18 +47,25 @@ export default function AudioVisualizer({
   className = '',
 }: AudioVisualizerProps) {
   const playback = usePlayback();
+  const ready = useAudioAnalyser();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [heights, setHeights] = React.useState<number[]>(
+  const [heights, setHeights] = useState<number[]>(
     () => generateBarHeights(barCount, playback.isPlaying)
   );
 
   useEffect(() => {
     if (playback.isPlaying) {
       intervalRef.current = setInterval(() => {
-        setHeights(generateBarHeights(barCount, true));
+        const analyser = getAnalyser();
+        if (ready && analyser) {
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(dataArray);
+          setHeights(mapFrequencyToBars(dataArray, barCount));
+        } else {
+          setHeights(generateBarHeights(barCount, true));
+        }
       }, 120);
     } else {
-      // Settle to resting state
       setHeights(generateBarHeights(barCount, false));
     }
 
@@ -51,7 +75,7 @@ export default function AudioVisualizer({
         intervalRef.current = null;
       }
     };
-  }, [playback.isPlaying, barCount]);
+  }, [playback.isPlaying, ready, barCount]);
 
   const totalWidth = barCount * barWidth + (barCount - 1) * barGap;
 
@@ -87,7 +111,8 @@ export function SpectrumAnalyzer({
   className = '',
 }: Omit<AudioVisualizerProps, 'color'> & { gradientColors?: string[] }) {
   const playback = usePlayback();
-  const [heights, setHeights] = React.useState<number[]>(
+  const ready = useAudioAnalyser();
+  const [heights, setHeights] = useState<number[]>(
     () => generateBarHeights(barCount, false)
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -95,7 +120,14 @@ export function SpectrumAnalyzer({
   useEffect(() => {
     if (playback.isPlaying) {
       intervalRef.current = setInterval(() => {
-        setHeights(generateBarHeights(barCount, true));
+        const analyser = getAnalyser();
+        if (ready && analyser) {
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(dataArray);
+          setHeights(mapFrequencyToBars(dataArray, barCount));
+        } else {
+          setHeights(generateBarHeights(barCount, true));
+        }
       }, 100);
     } else {
       setHeights(generateBarHeights(barCount, false));
@@ -106,7 +138,7 @@ export function SpectrumAnalyzer({
         intervalRef.current = null;
       }
     };
-  }, [playback.isPlaying, barCount]);
+  }, [playback.isPlaying, ready, barCount]);
 
   const totalWidth = barCount * barWidth + (barCount - 1) * barGap;
 

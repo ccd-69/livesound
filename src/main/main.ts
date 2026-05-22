@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net, desktopCapturer } from 'electron';
 import http from 'http';
 import fs from 'fs';
 import os from 'os';
@@ -357,6 +357,21 @@ app.whenReady().then(async () => {
   if (cacheResult.versionChanged) {
     console.log(`[Optimize] Updated ${cacheResult.previousVersion} -> ${cacheResult.currentVersion}, caches cleared`);
   }
+
+  // Allow renderer to capture app audio for the visualizer without a picker dialog
+  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+    try {
+      const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
+      const appSource = sources.find((s) => s.name === 'LiveSound') || sources[0];
+      if (!appSource) {
+        callback({});
+        return;
+      }
+      callback({ video: appSource, audio: 'loopback' });
+    } catch {
+      callback({});
+    }
+  });
 
   // Restore saved credentials into auth modules on startup
   const startupSettings = loadSettings();
