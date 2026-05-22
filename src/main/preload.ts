@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { exposeAudioCaptureApi } from 'process-audio-capture/dist/preload.js';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Settings
@@ -51,6 +52,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // App info
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getAppPid: () => ipcRenderer.invoke('get-app-pid'),
 
   // Updates
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
@@ -86,3 +88,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('media-previous', listener);
   },
 });
+
+// Expose per-process audio capture API for the visualizer
+exposeAudioCaptureApi();

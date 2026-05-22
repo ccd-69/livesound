@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net, desktopCapturer } from 'electron';
+import { setupAudioCaptureIpc } from 'process-audio-capture/dist/main.js';
 import http from 'http';
 import fs from 'fs';
 import os from 'os';
@@ -358,20 +359,8 @@ app.whenReady().then(async () => {
     console.log(`[Optimize] Updated ${cacheResult.previousVersion} -> ${cacheResult.currentVersion}, caches cleared`);
   }
 
-  // Allow renderer to capture app audio for the visualizer without a picker dialog
-  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    try {
-      const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
-      const appSource = sources.find((s) => s.name === 'LiveSound') || sources[0];
-      if (!appSource) {
-        callback({});
-        return;
-      }
-      callback({ video: appSource, audio: 'loopback' });
-    } catch {
-      callback({});
-    }
-  });
+  // Setup per-process audio capture IPC for the visualizer
+  setupAudioCaptureIpc();
 
   // Restore saved credentials into auth modules on startup
   const startupSettings = loadSettings();
@@ -698,6 +687,7 @@ ipcMain.handle('clear-cache', () => {
 
 // App info
 ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('get-app-pid', () => process.pid);
 
 // Update IPC
 ipcMain.handle('get-update-status', () => updater.getStatus());

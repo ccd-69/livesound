@@ -3,6 +3,7 @@
 interface Window {
   electronAPI: {
     getAppVersion: () => Promise<string>;
+    getAppPid: () => Promise<number>;
     getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
     checkForUpdates: () => Promise<void>;
     downloadUpdate: () => Promise<void>;
@@ -47,5 +48,18 @@ interface Window {
     youtubeVideoDetails: (videoId: string) => Promise<{ success: boolean; details?: any; error?: string }>;
     youtubeVideoComments: (videoId: string) => Promise<{ success: boolean; comments?: any[]; error?: string }>;
     youtubePostComment: (videoId: string, text: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  /** Per-process audio capture API for the visualizer */
+  processAudioCapture?: {
+    isPlatformSupported: () => Promise<boolean>;
+    checkPermission: () => Promise<any>;
+    requestPermission: () => Promise<any>;
+    getProcessList: () => Promise<any[]>;
+    startCapture: (pid: number) => Promise<boolean>;
+    stopCapture: () => Promise<boolean>;
+    isCapturing: () => Promise<boolean>;
+    on: (event: string, callback: (...args: any[]) => void) => () => void;
+    off: (event?: string) => void;
   };
 }

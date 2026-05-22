@@ -22,18 +22,32 @@ function generateBarHeights(count: number, isPlaying: boolean): number[] {
   });
 }
 
-function mapFrequencyToBars(freqData: Uint8Array, barCount: number): number[] {
+/** Map FFT bins to bars using logarithmic frequency scaling (20 Hz – 20 kHz). */
+function mapFrequencyToBarsLog(
+  freqData: Uint8Array,
+  barCount: number,
+  sampleRate: number,
+  minFreq = 20,
+  maxFreq = 20000
+): number[] {
+  const nyquist = sampleRate / 2;
+  const binCount = freqData.length;
+  const freqPerBin = nyquist / binCount;
   const bars: number[] = [];
-  const binsPerBar = Math.max(1, Math.floor(freqData.length / barCount));
+
   for (let i = 0; i < barCount; i++) {
+    const fStart = minFreq * Math.pow(maxFreq / minFreq, i / barCount);
+    const fEnd = minFreq * Math.pow(maxFreq / minFreq, (i + 1) / barCount);
+    const binStart = Math.max(0, Math.floor(fStart / freqPerBin));
+    const binEnd = Math.min(binCount, Math.floor(fEnd / freqPerBin));
+
     let sum = 0;
-    for (let j = 0; j < binsPerBar; j++) {
-      const idx = i * binsPerBar + j;
-      if (idx < freqData.length) {
-        sum += freqData[idx];
-      }
+    let count = 0;
+    for (let b = binStart; b < binEnd; b++) {
+      sum += freqData[b];
+      count++;
     }
-    bars.push((sum / binsPerBar) / 255);
+    bars.push(count > 0 ? sum / count / 255 : 0);
   }
   return bars;
 }
@@ -60,7 +74,7 @@ export default function AudioVisualizer({
         if (ready && analyser) {
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           analyser.getByteFrequencyData(dataArray);
-          setHeights(mapFrequencyToBars(dataArray, barCount));
+          setHeights(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate));
         } else {
           setHeights(generateBarHeights(barCount, true));
         }
@@ -124,7 +138,7 @@ export function SpectrumAnalyzer({
         if (ready && analyser) {
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           analyser.getByteFrequencyData(dataArray);
-          setHeights(mapFrequencyToBars(dataArray, barCount));
+          setHeights(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate));
         } else {
           setHeights(generateBarHeights(barCount, true));
         }
