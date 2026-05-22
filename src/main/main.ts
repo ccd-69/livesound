@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net } from 'electron';
 import http from 'http';
 import fs from 'fs';
+import os from 'os';
 import {
   cleanupTempFiles,
   clearCacheOnUpdate,
@@ -26,6 +27,39 @@ async function getYoutubeDl() {
     youtubedl = mod.default || mod;
   }
   return youtubedl;
+}
+
+// Extract session cookies for yt-dlp so age-restricted content can play
+// using the Google account cookies from the in-app OAuth flow.
+async function writeSessionCookiesToFile(): Promise<string | null> {
+  try {
+    const allCookies = await session.defaultSession.cookies.get({});
+    const relevant = allCookies.filter((c: any) => {
+      const d = c.domain || '';
+      return d.includes('youtube.com') || d.includes('google.com');
+    });
+    if (relevant.length === 0) return null;
+
+    const lines = [
+      '# Netscape HTTP Cookie File',
+      '# https://curl.se/rfc/cookie_spec.html',
+      '# This is a generated file! Do not edit.',
+      '',
+    ];
+    for (const c of relevant) {
+      const domain = c.domain || '';
+      const subdomains = domain.startsWith('.') ? 'TRUE' : 'FALSE';
+      const secure = c.secure ? 'TRUE' : 'FALSE';
+      const expiry = c.expirationDate ? Math.floor(c.expirationDate).toString() : '0';
+      lines.push(`${domain}\t${subdomains}\t${c.path || '/'}\t${secure}\t${expiry}\t${c.name}\t${c.value}`);
+    }
+
+    const tmpFile = path.join(os.tmpdir(), `livesound_cookies_${Date.now()}.txt`);
+    fs.writeFileSync(tmpFile, lines.join('\n'));
+    return tmpFile;
+  } catch {
+    return null;
+  }
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -659,6 +693,9 @@ ipcMain.handle('install-update', () => {
   mainWindow?.removeAllListeners('close');
   updater.quitAndInstall();
 });
+ipcMain.handle('download-update', () => {
+  updater.downloadUpdate();
+});
 
 // Window controls
 ipcMain.handle('minimize-window', () => {
@@ -690,13 +727,21 @@ ipcMain.handle('is-window-maximized', () => {
 
 // YouTube Playback IPC
 ipcMain.handle('youtube-get-stream-url', async (_event, videoUrl: string) => {
+  let cookiesFile: string | null = null;
   try {
     const ydl = await getYoutubeDl();
-    const result = await ydl(videoUrl, {
+    cookiesFile = await writeSessionCookiesToFile();
+
+    const options: any = {
       dumpSingleJson: true,
       noCheckCertificates: true,
       noWarnings: true,
-    });
+    };
+    if (cookiesFile) {
+      options.cookies = cookiesFile;
+    }
+
+    const result = await ydl(videoUrl, options);
 
     // Prefer audio-only formats, fallback to any format with audio
     const audioFormat = result.formats?.find(
@@ -709,6 +754,37 @@ ipcMain.handle('youtube-get-stream-url', async (_event, videoUrl: string) => {
       title: result.title,
       thumbnail: result.thumbnail,
     };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  } finally {
+    if (cookiesFile) {
+      try { fs.unlinkSync(cookiesFile); } catch { /* ignore */ }
+    }
+  }
+});
+
+ipcMain.handle('youtube-video-details', async (_event, videoId: string) => {
+  try {
+    const details = await youtubeApi.getVideoDetails(videoId);
+    return { success: true, details };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('youtube-video-comments', async (_event, videoId: string) => {
+  try {
+    const comments = await youtubeApi.getVideoComments(videoId);
+    return { success: true, comments };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('youtube-post-comment', async (_event, videoId: string, text: string) => {
+  try {
+    await youtubeApi.postVideoComment(videoId, text);
+    return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }

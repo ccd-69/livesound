@@ -5,6 +5,7 @@ interface Window {
     getAppVersion: () => Promise<string>;
     getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
     checkForUpdates: () => Promise<void>;
+    downloadUpdate: () => Promise<void>;
     installUpdate: () => Promise<void>;
     onUpdateStatus: (cb: (payload: { status: string; version?: string; error?: string }) => void) => () => void;
     getSettings: () => Promise<Record<string, any>>;
@@ -43,5 +44,8 @@ interface Window {
     youtubePlayView: () => Promise<void>;
     youtubePauseView: () => Promise<void>;
     youtubeShowView: (show: boolean) => Promise<void>;
+    youtubeVideoDetails: (videoId: string) => Promise<{ success: boolean; details?: any; error?: string }>;
+    youtubeVideoComments: (videoId: string) => Promise<{ success: boolean; comments?: any[]; error?: string }>;
+    youtubePostComment: (videoId: string, text: string) => Promise<{ success: boolean; error?: string }>;
   };
 }

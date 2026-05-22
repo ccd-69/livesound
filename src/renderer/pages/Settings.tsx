@@ -325,7 +325,7 @@ export default function Settings() {
         {/* About */}
         <Section icon={<Info size={18} />} title="About">
           <p className="text-sm text-muted">
-            LiveSound v1.0.0 — Personal unified media player for Spotify and YouTube Music.
+            LiveSound v1.0.2 — Personal unified media player for Spotify and YouTube Music.
           </p>
         </Section>
       </div>

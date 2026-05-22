@@ -1,6 +1,6 @@
 {
   "name": "livesound",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Unified media player for Spotify and YouTube Music",
   "author": "ccd-69",
   "main": "dist/main/main.js",

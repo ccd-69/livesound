@@ -42,6 +42,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   youtubePlayView: () => ipcRenderer.invoke('youtube-play-view'),
   youtubePauseView: () => ipcRenderer.invoke('youtube-pause-view'),
   youtubeShowView: (show: boolean) => ipcRenderer.invoke('youtube-show-view', show),
+  youtubeVideoDetails: (videoId: string) => ipcRenderer.invoke('youtube-video-details', videoId),
+  youtubeVideoComments: (videoId: string) => ipcRenderer.invoke('youtube-video-comments', videoId),
+  youtubePostComment: (videoId: string, text: string) => ipcRenderer.invoke('youtube-post-comment', videoId, text),
 
   // Cache
   clearCache: () => ipcRenderer.invoke('clear-cache'),
@@ -52,6 +55,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Updates
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   onUpdateStatus: (cb: (payload: { status: string; version?: string; error?: string }) => void) => {
     const listener = (_event: any, payload: any) => cb(payload);

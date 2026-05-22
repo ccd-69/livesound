@@ -336,7 +336,13 @@ function PlaylistDetail({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03, duration: 0.2 }}
-            onClick={() => playback.playTrack(t)}
+            onClick={() => {
+            if (playlist.source === 'youtube') {
+              const idx = tracks.findIndex((qt) => qt.id === t.id);
+              playback.setYoutubeQueue(tracks, idx >= 0 ? idx : 0);
+            }
+            playback.playTrack(t);
+          }}
             className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-hover"
           >
             <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-hover">

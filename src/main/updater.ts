@@ -10,7 +10,7 @@ let currentVersion: string | null = null;
 let currentError: string | null = null;
 let mainWindow: BrowserWindow | null = null;
 
-autoUpdater.autoDownload = true;
+autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
 
 autoUpdater.on('checking-for-update', () => {
@@ -70,6 +70,10 @@ export function sendCurrentStatus() {
 
 export function checkForUpdates() {
   return autoUpdater.checkForUpdates();
+}
+
+export function downloadUpdate() {
+  return autoUpdater.downloadUpdate();
 }
 
 export function quitAndInstall() {

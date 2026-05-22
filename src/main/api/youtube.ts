@@ -240,3 +240,64 @@ export async function addVideoToPlaylist(playlistId: string, videoId: string): P
   });
   if (!res.ok) throw new Error(`Add to playlist failed: ${res.status}`);
 }
+
+export async function getVideoDetails(videoId: string): Promise<any> {
+  const token = await youtubeAuth.getValidAccessToken();
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error(`Video details fetch failed: ${res.status}`);
+  const data = await res.json();
+  const item = data.items?.[0];
+  if (!item) return null;
+  return {
+    id: item.id,
+    title: item.snippet?.title || '',
+    description: item.snippet?.description || '',
+    channelTitle: item.snippet?.channelTitle || '',
+    publishedAt: item.snippet?.publishedAt || '',
+    viewCount: item.statistics?.viewCount || '0',
+    likeCount: item.statistics?.likeCount || '0',
+    commentCount: item.statistics?.commentCount || '0',
+  };
+}
+
+export async function getVideoComments(videoId: string): Promise<any[]> {
+  const token = await youtubeAuth.getValidAccessToken();
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=20&order=relevance`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error(`Comments fetch failed: ${res.status}`);
+  const data = await res.json();
+  return (data.items || []).map((item: any) => {
+    const snippet = item.snippet?.topLevelComment?.snippet || {};
+    return {
+      id: item.id,
+      author: snippet.authorDisplayName || 'Unknown',
+      authorImage: snippet.authorProfileImageUrl || '',
+      text: snippet.textDisplay || '',
+      likeCount: snippet.likeCount || 0,
+      publishedAt: snippet.publishedAt || '',
+      replyCount: item.snippet?.totalReplyCount || 0,
+    };
+  });
+}
+
+export async function postVideoComment(videoId: string, text: string): Promise<void> {
+  const token = await youtubeAuth.getValidAccessToken();
+  const res = await fetch('https://www.googleapis.com/youtube/v3/commentThreads?part=snippet', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      snippet: {
+        videoId,
+        topLevelComment: {
+          snippet: { textOriginal: text },
+        },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Post comment failed: ${res.status}`);
+}

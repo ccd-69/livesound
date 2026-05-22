@@ -5,7 +5,10 @@ import { useSpotifyPlayer } from './useSpotify';
 export interface YoutubeController {
   play: () => void;
   pause: () => void;
+  seek?: (seconds: number) => void;
 }
+
+export type RepeatMode = 'off' | 'loop' | 'loop-single' | 'shuffle';
 
 interface PlaybackState {
   isPlaying: boolean;
@@ -16,6 +19,9 @@ interface PlaybackState {
   youtubeMode: string;
   youtubeCurrentTrack: any | null;
   isYouTubePlaying: boolean;
+  repeatMode: RepeatMode;
+  youtubeQueue: any[];
+  youtubeQueueIndex: number;
   play: () => void;
   pause: () => void;
   toggle: () => void;
@@ -27,6 +33,8 @@ interface PlaybackState {
   pauseYouTube: () => void;
   stopYouTube: () => void;
   setYoutubeController: (ctrl: YoutubeController | null) => void;
+  toggleRepeatMode: () => void;
+  setYoutubeQueue: (tracks: any[], index: number) => void;
 }
 
 const PlaybackContext = createContext<PlaybackState | null>(null);
@@ -38,6 +46,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const [youtubeMode, setYoutubeMode] = useState('iframe');
   const [youtubeCurrentTrack, setYoutubeCurrentTrack] = useState<any | null>(null);
   const [isYouTubePlaying, setIsYouTubePlaying] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+  const [youtubeQueue, setYoutubeQueueState] = useState<any[]>([]);
+  const [youtubeQueueIndex, setYoutubeQueueIndex] = useState<number>(0);
   const youtubeControllerRef = useRef<YoutubeController | null>(null);
 
   useEffect(() => {
@@ -127,34 +138,18 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }
   }, [spotify, youtubeCurrentTrack, isYouTubePlaying, youtubeMode]);
 
-  const next = useCallback(() => {
-    if (youtubeCurrentTrack) {
-      stopYouTube();
-    }
-    spotify.nextTrack();
-  }, [spotify, youtubeCurrentTrack, stopYouTube]);
+  const toggleRepeatMode = useCallback(() => {
+    setRepeatMode((prev) => {
+      const modes: RepeatMode[] = ['off', 'loop', 'loop-single', 'shuffle'];
+      const idx = modes.indexOf(prev);
+      return modes[(idx + 1) % modes.length];
+    });
+  }, []);
 
-  const previous = useCallback(() => {
-    if (youtubeCurrentTrack) {
-      stopYouTube();
-    }
-    spotify.previousTrack();
-  }, [spotify, youtubeCurrentTrack, stopYouTube]);
-
-  const seek = useCallback(
-    (ms: number) => {
-      spotify.seek(ms);
-    },
-    [spotify]
-  );
-
-  const setVolume = useCallback(
-    (v: number) => {
-      setVolumeState(v);
-      spotify.setVolume(v);
-    },
-    [spotify]
-  );
+  const setYoutubeQueue = useCallback((tracks: any[], index: number) => {
+    setYoutubeQueueState(tracks);
+    setYoutubeQueueIndex(index);
+  }, []);
 
   const playTrack = useCallback(
     async (track: any) => {
@@ -191,6 +186,95 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [spotify, youtubeMode, stopYouTube]
+  );
+
+  const next = useCallback(() => {
+    if (youtubeCurrentTrack) {
+      if (repeatMode === 'loop-single') {
+        if (youtubeControllerRef.current?.seek) {
+          youtubeControllerRef.current.seek(0);
+          youtubeControllerRef.current.play();
+        } else {
+          playTrack(youtubeCurrentTrack);
+        }
+        return;
+      }
+      if (youtubeQueue.length > 0) {
+        let nextIndex: number;
+        if (repeatMode === 'shuffle') {
+          const candidates = youtubeQueue.map((_, i) => i).filter((i) => i !== youtubeQueueIndex);
+          nextIndex = candidates.length === 0 ? 0 : candidates[Math.floor(Math.random() * candidates.length)];
+        } else {
+          nextIndex = youtubeQueueIndex + 1;
+          if (nextIndex >= youtubeQueue.length) {
+            if (repeatMode === 'loop') {
+              nextIndex = 0;
+            } else {
+              stopYouTube();
+              spotify.nextTrack();
+              return;
+            }
+          }
+        }
+        setYoutubeQueueIndex(nextIndex);
+        playTrack(youtubeQueue[nextIndex]);
+        return;
+      }
+      stopYouTube();
+    }
+    spotify.nextTrack();
+  }, [spotify, youtubeCurrentTrack, youtubeQueue, youtubeQueueIndex, repeatMode, stopYouTube, playTrack]);
+
+  const previous = useCallback(() => {
+    if (youtubeCurrentTrack) {
+      if (repeatMode === 'loop-single') {
+        if (youtubeControllerRef.current?.seek) {
+          youtubeControllerRef.current.seek(0);
+          youtubeControllerRef.current.play();
+        } else {
+          playTrack(youtubeCurrentTrack);
+        }
+        return;
+      }
+      if (youtubeQueue.length > 0) {
+        let prevIndex: number;
+        if (repeatMode === 'shuffle') {
+          const candidates = youtubeQueue.map((_, i) => i).filter((i) => i !== youtubeQueueIndex);
+          prevIndex = candidates.length === 0 ? 0 : candidates[Math.floor(Math.random() * candidates.length)];
+        } else {
+          prevIndex = youtubeQueueIndex - 1;
+          if (prevIndex < 0) {
+            if (repeatMode === 'loop') {
+              prevIndex = youtubeQueue.length - 1;
+            } else {
+              stopYouTube();
+              spotify.previousTrack();
+              return;
+            }
+          }
+        }
+        setYoutubeQueueIndex(prevIndex);
+        playTrack(youtubeQueue[prevIndex]);
+        return;
+      }
+      stopYouTube();
+    }
+    spotify.previousTrack();
+  }, [spotify, youtubeCurrentTrack, youtubeQueue, youtubeQueueIndex, repeatMode, stopYouTube, playTrack]);
+
+  const seek = useCallback(
+    (ms: number) => {
+      spotify.seek(ms);
+    },
+    [spotify]
+  );
+
+  const setVolume = useCallback(
+    (v: number) => {
+      setVolumeState(v);
+      spotify.setVolume(v);
+    },
+    [spotify]
   );
 
   const pauseYouTube = useCallback(() => {
@@ -275,6 +359,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     youtubeMode,
     youtubeCurrentTrack,
     isYouTubePlaying,
+    repeatMode,
+    youtubeQueue,
+    youtubeQueueIndex,
     play,
     pause,
     toggle,
@@ -286,6 +373,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     pauseYouTube,
     stopYouTube,
     setYoutubeController,
+    toggleRepeatMode,
+    setYoutubeQueue,
   };
 
   return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;

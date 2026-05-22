@@ -5,6 +5,8 @@ import {
   Play,
   Pause,
   SkipForward,
+  Shuffle,
+  Repeat,
   Volume2,
   Volume1,
   VolumeX,
@@ -97,6 +99,10 @@ export default function PlayerBar() {
           large
         />
         <ControlButton onClick={playback.next} icon={<SkipForward size={20} />} />
+        <CycleButton
+          mode={playback.repeatMode}
+          onClick={playback.toggleRepeatMode}
+        />
       </div>
 
       {/* Equalizer — hidden for YouTube tracks (no audio data) */}
@@ -178,18 +184,63 @@ function ControlButton({
   onClick,
   icon,
   large,
+  active,
 }: {
   onClick: () => void;
   icon: React.ReactNode;
   large?: boolean;
+  active?: boolean;
 }) {
   return (
     <motion.button
       whileHover={{ scale: 1.12 }}
       whileTap={{ scale: 0.92 }}
       onClick={onClick}
-      className={`flex items-center justify-center rounded-full bg-transparent text-text transition-colors hover:text-accent ${
+      className={`flex items-center justify-center rounded-full text-text transition-colors ${
         large ? 'h-10 w-10' : 'h-8 w-8'
+      } ${active ? 'bg-accent/20 text-accent' : 'bg-transparent hover:text-accent'}`}
+    >
+      {icon}
+    </motion.button>
+  );
+}
+
+function CycleButton({
+  mode,
+  onClick,
+}: {
+  mode: import('../hooks/usePlayback').RepeatMode;
+  onClick: () => void;
+}) {
+  const isActive = mode !== 'off';
+  const icon =
+    mode === 'shuffle' ? (
+      <Shuffle size={18} />
+    ) : mode === 'loop-single' ? (
+      <div className="relative flex items-center justify-center">
+        <Repeat size={18} />
+        <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-black leading-none">1</span>
+      </div>
+    ) : (
+      <Repeat size={18} />
+    );
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.12 }}
+      whileTap={{ scale: 0.92 }}
+      onClick={onClick}
+      title={
+        mode === 'off'
+          ? 'Repeat: Off'
+          : mode === 'loop'
+          ? 'Repeat: Loop'
+          : mode === 'loop-single'
+          ? 'Repeat: Loop Single'
+          : 'Shuffle'
+      }
+      className={`flex items-center justify-center rounded-full text-text transition-colors h-8 w-8 ${
+        isActive ? 'bg-accent/20 text-accent' : 'bg-transparent hover:text-accent'
       }`}
     >
       {icon}

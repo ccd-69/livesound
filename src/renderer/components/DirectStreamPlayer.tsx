@@ -63,6 +63,11 @@ export default function DirectStreamPlayer({
         audioRef.current?.pause();
         setPlaying(false);
       },
+      seek: (seconds: number) => {
+        if (audioRef.current) {
+          audioRef.current.currentTime = seconds;
+        }
+      },
     };
     playback.setYoutubeController(controller);
     return () => {
@@ -108,11 +113,17 @@ export default function DirectStreamPlayer({
         ref={audioRef}
         src={streamUrl}
         autoPlay
-        controls
-        className="w-full max-w-md"
+        className="hidden"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          if (playback.repeatMode === 'loop-single') {
+            audioRef.current?.play().catch(() => {});
+          } else if (playback.repeatMode === 'loop' || playback.repeatMode === 'shuffle') {
+            playback.next();
+          }
+        }}
       />
 
       <motion.button

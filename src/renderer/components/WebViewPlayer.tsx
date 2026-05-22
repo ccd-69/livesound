@@ -54,6 +54,12 @@ export default function WebViewPlayer({
           if (video) video.pause();
         `).catch(() => {});
       },
+      seek: (seconds: number) => {
+        webviewRef.current?.executeJavaScript(`
+          const video = document.querySelector('video');
+          if (video) video.currentTime = ${seconds};
+        `).catch(() => {});
+      },
     };
     playback.setYoutubeController(controller);
     return () => {
