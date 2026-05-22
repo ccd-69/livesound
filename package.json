@@ -131,7 +131,9 @@
     "publish": {
       "provider": "github",
       "owner": "ccd-69",
-      "repo": "LiveSound"
+      "repo": "livesound",
+      "vPrefixedTagName": true,
+      "releaseType": "release"
     }
   },
   "devDependencies": {

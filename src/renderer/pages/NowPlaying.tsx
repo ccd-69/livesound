@@ -42,9 +42,14 @@ export default function NowPlaying() {
   const albumImage = track?.album?.images?.[0]?.url;
 
   useEffect(() => {
-    window.electronAPI.getSettings().then((s: any) => {
-      setShowSpectrum(s.showSpectrumAnalyzer ?? false);
-    });
+    function refresh() {
+      window.electronAPI.getSettings().then((s: any) => {
+        setShowSpectrum(s.showSpectrumAnalyzer ?? false);
+      });
+    }
+    refresh();
+    window.addEventListener('settings-changed', refresh);
+    return () => window.removeEventListener('settings-changed', refresh);
   }, []);
 
   // Generate a blurred background from the album image

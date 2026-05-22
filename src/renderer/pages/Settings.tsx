@@ -50,6 +50,7 @@ export default function Settings() {
     const next = { ...settings, [key]: value };
     setSettings(next);
     window.electronAPI.saveSettings(next);
+    window.dispatchEvent(new CustomEvent('settings-changed'));
   };
 
   const saveSpotifyId = () => {

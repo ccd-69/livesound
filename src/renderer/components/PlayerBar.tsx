@@ -29,9 +29,14 @@ export default function PlayerBar() {
   const [showEqualizer, setShowEqualizer] = useState(false);
 
   useEffect(() => {
-    window.electronAPI.getSettings().then((s: any) => {
-      setShowEqualizer(s.showEqualizer ?? false);
-    });
+    function refresh() {
+      window.electronAPI.getSettings().then((s: any) => {
+        setShowEqualizer(s.showEqualizer ?? false);
+      });
+    }
+    refresh();
+    window.addEventListener('settings-changed', refresh);
+    return () => window.removeEventListener('settings-changed', refresh);
   }, []);
 
   const progressPercent = playback.duration
@@ -105,9 +110,9 @@ export default function PlayerBar() {
         />
       </div>
 
-      {/* Equalizer — hidden for YouTube tracks (no audio data) */}
+      {/* Equalizer */}
       <AnimatePresence>
-        {showEqualizer && !playback.isYouTubePlaying && (
+        {showEqualizer && (
           <motion.div
             initial={{ opacity: 0, width: 0 }}
             animate={{ opacity: 1, width: 'auto' }}
