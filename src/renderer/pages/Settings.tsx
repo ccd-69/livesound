@@ -81,7 +81,7 @@ export default function Settings() {
       case 'checking':
         return 'Checking for updates...';
       case 'available':
-        return `Update available: v${updateStatus.version} (downloading...)`;
+        return `Update available: v${updateStatus.version}. Click Download to get it.`;
       case 'downloaded':
         return `Update v${updateStatus.version} is ready to install.`;
       case 'error':
@@ -309,6 +309,16 @@ export default function Settings() {
                   'Check for Updates'
                 )}
               </motion.button>
+              {updateStatus.status === 'available' && (
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => window.electronAPI.downloadUpdate()}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black"
+                >
+                  Download
+                </motion.button>
+              )}
               {updateStatus.status === 'downloaded' && (
                 <motion.button
                   whileHover={{ scale: 1.03 }}
@@ -326,7 +336,7 @@ export default function Settings() {
         {/* About */}
         <Section icon={<Info size={18} />} title="About">
           <p className="text-sm text-muted">
-            LiveSound v1.0.3 — Personal unified media player for Spotify and YouTube Music.
+            LiveSound v1.0.4 — Personal unified media player for Spotify and YouTube Music.
           </p>
         </Section>
       </div>

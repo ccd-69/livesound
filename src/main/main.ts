@@ -1,5 +1,8 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net, desktopCapturer } from 'electron';
 import { setupAudioCaptureIpc } from 'process-audio-capture/dist/main.js';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { audioCapture } = require('process-audio-capture/dist/index.js') as typeof import('process-audio-capture/dist/index.js');
 import http from 'http';
 import fs from 'fs';
 import os from 'os';
@@ -89,6 +92,14 @@ function destroyTray() {
   }
 }
 
+function stopAudioCapture() {
+  try {
+    if (audioCapture?.isCapturing) {
+      audioCapture.stopCapture();
+    }
+  } catch {}
+}
+
 let staticServerPort = 0;
 
 function startStaticServer(): Promise<number> {
@@ -176,6 +187,7 @@ async function createWindow() {
 
   mainWindow.on('closed', () => {
     destroyYtmView();
+    stopAudioCapture();
     mainWindow = null;
   });
 
@@ -191,14 +203,10 @@ async function createWindow() {
     });
   });
 
-  // Minimize to tray on close for all platforms
-  mainWindow.on('close', (event) => {
-    event.preventDefault();
-    mainWindow?.hide();
-    // On macOS, also hide from dock when window is hidden
-    if (process.platform === 'darwin') {
-      app.dock?.hide();
-    }
+  // Fully close app when window is closed (do not minimize to tray)
+  mainWindow.on('close', () => {
+    destroyYtmView();
+    stopAudioCapture();
   });
 
   // Sync when window is shown from tray/minimized
@@ -488,6 +496,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   globalShortcut.unregisterAll();
   destroyYtmView();
+  stopAudioCapture();
   if (isDev || process.platform !== 'darwin') {
     // In dev mode, quit immediately so leftover processes don't accumulate
     // On Windows/Linux quit when all windows are closed
@@ -499,6 +508,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   globalShortcut.unregisterAll();
   destroyYtmView();
+  stopAudioCapture();
   destroyTray();
 });
 

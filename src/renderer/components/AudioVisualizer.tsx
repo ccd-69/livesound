@@ -52,6 +52,28 @@ function mapFrequencyToBarsLog(
   return bars;
 }
 
+/**
+ * Add an 1/8-note rhythmic bounce to the bass bars (low-frequency range).
+ * Only affects the first ~30% of bars and only when audio is present.
+ */
+function addBassVibe(bars: number[], barCount: number): number[] {
+  const bassCount = Math.max(2, Math.ceil(barCount * 0.3)); // first 30% = bass guitar range (~20-250 Hz)
+  const t = Date.now() / 1000;
+  // 1/8 note feel at ~120 BPM: 4 pulses/sec. We add a little swing with two layered sines.
+  const beat = 0.6 * Math.abs(Math.sin(t * 5)) + 0.4 * Math.abs(Math.sin(t * 7.5));
+
+  const out = bars.slice();
+  for (let i = 0; i < bassCount; i++) {
+    if (out[i] > 0.05) {
+      // intensity falls off toward the mid-range transition
+      const positionWeight = 1 - i / bassCount;
+      const vibe = 0.15 + beat * 0.35 * positionWeight;
+      out[i] = Math.min(1, out[i] * (1 + vibe));
+    }
+  }
+  return out;
+}
+
 export default function AudioVisualizer({
   barCount = 32,
   barWidth = 4,
@@ -74,7 +96,7 @@ export default function AudioVisualizer({
         if (ready && analyser) {
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           analyser.getByteFrequencyData(dataArray);
-          setHeights(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate));
+          setHeights(addBassVibe(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate), barCount));
         } else {
           setHeights(generateBarHeights(barCount, true));
         }
@@ -138,7 +160,7 @@ export function SpectrumAnalyzer({
         if (ready && analyser) {
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           analyser.getByteFrequencyData(dataArray);
-          setHeights(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate));
+          setHeights(addBassVibe(mapFrequencyToBarsLog(dataArray, barCount, analyser.sampleRate), barCount));
         } else {
           setHeights(generateBarHeights(barCount, true));
         }
