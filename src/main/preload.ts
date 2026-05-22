@@ -1,5 +1,37 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { exposeAudioCaptureApi } from 'process-audio-capture/dist/preload.js';
+
+const PREFIX = 'process-audio-capture';
+
+function ipcRendererInvoke(channel: string, ...args: any[]) {
+  return ipcRenderer.invoke(channel, ...args);
+}
+
+function uuid() {
+  return crypto.randomUUID();
+}
+
+const processAudioCapture = {
+  isPlatformSupported: () => ipcRendererInvoke(`${PREFIX}:is-platform-supported`),
+  checkPermission: () => ipcRendererInvoke(`${PREFIX}:check-permission`),
+  requestPermission: () => ipcRendererInvoke(`${PREFIX}:request-permission`),
+  getProcessList: () => ipcRendererInvoke(`${PREFIX}:get-process-list`),
+  startCapture: (pid: number) => ipcRendererInvoke(`${PREFIX}:start-capture`, pid),
+  stopCapture: () => ipcRendererInvoke(`${PREFIX}:stop-capture`),
+  isCapturing: () => ipcRendererInvoke(`${PREFIX}:is-capturing`),
+  on: (eventName: string, callback: (...args: any[]) => void) => {
+    const id = uuid();
+    const listener = (_event: any, ...args: any[]) => callback(...args);
+    ipcRenderer.send(`${PREFIX}:on-${eventName}`, id);
+    ipcRenderer.on(`${PREFIX}:on-${eventName}:${id}`, listener);
+    return () => {
+      ipcRenderer.off(`${PREFIX}:on-${eventName}:${id}`, listener);
+      ipcRenderer.send(`${PREFIX}:off-${eventName}`, id);
+    };
+  },
+  off: (eventName?: string) => {
+    ipcRenderer.send(`${PREFIX}:off-all`, eventName);
+  },
+};
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Settings
@@ -87,7 +119,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('media-previous', listener);
     return () => ipcRenderer.removeListener('media-previous', listener);
   },
-});
 
-// Expose per-process audio capture API for the visualizer
-exposeAudioCaptureApi();
+  // Per-process audio capture for visualizer
+  processAudioCapture,
+});

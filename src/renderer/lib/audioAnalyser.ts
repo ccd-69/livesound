@@ -5,6 +5,10 @@ let captureStarted = false;
 let sampleRate = 48000;
 let unsubscribeAudioData: (() => void) | null = null;
 
+function getCaptureApi() {
+  return window.electronAPI?.processAudioCapture ?? null;
+}
+
 const WORKLET_CODE = `
 class PcmFeed extends AudioWorkletProcessor {
   constructor() {
@@ -36,20 +40,20 @@ registerProcessor('pcm-feed', PcmFeed);
 
 export async function startAudioCapture(): Promise<boolean> {
   if (captureStarted) return true;
-  if (!window.processAudioCapture) return false;
+  const api = getCaptureApi();
+  if (!api) return false;
 
   try {
-    const supported = await window.processAudioCapture.isPlatformSupported();
+    const supported = await api.isPlatformSupported();
     if (!supported) return false;
 
     const pid = await window.electronAPI.getAppPid();
-    const ok = await window.processAudioCapture.startCapture(pid);
+    const ok = await api.startCapture(pid);
     if (!ok) return false;
 
     captureStarted = true;
 
-    // Create audio graph once we know the sample rate
-    unsubscribeAudioData = window.processAudioCapture.on('audio-data', (audioData: any) => {
+    unsubscribeAudioData = api.on('audio-data', (audioData: any) => {
       if (!audioData?.buffer) return;
       sampleRate = audioData.sampleRate || 48000;
       ensureAudioGraph(sampleRate);
@@ -83,7 +87,6 @@ function ensureAudioGraph(sr: number) {
 
 function feedPcm(interleaved: Float32Array, channels: number) {
   if (!workletNode) return;
-  // Deinterleave to mono quickly
   const mono = new Float32Array(Math.floor(interleaved.length / channels));
   for (let i = 0; i < mono.length; i++) {
     mono[i] = interleaved[i * channels];
@@ -96,12 +99,13 @@ export function getAnalyser(): AnalyserNode | null {
 }
 
 export function stopAudioCapture() {
+  const api = getCaptureApi();
   if (unsubscribeAudioData) {
     unsubscribeAudioData();
     unsubscribeAudioData = null;
   }
-  if (window.processAudioCapture) {
-    window.processAudioCapture.stopCapture();
+  if (api) {
+    api.stopCapture();
   }
   if (workletNode) {
     workletNode.disconnect();
