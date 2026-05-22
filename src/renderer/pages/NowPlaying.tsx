@@ -176,27 +176,29 @@ export default function NowPlaying() {
             </>
           )}
 
-          {/* Track Info */}
-          <div className="flex flex-col items-center gap-1 text-center">
-            <motion.h1
-              key={track?.name || 'no-track-name'}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="text-2xl font-bold text-text"
-            >
-              {track?.name || 'No track selected'}
-            </motion.h1>
-            <motion.p
-              key={track?.artists?.map((a: any) => a.name).join(', ') || 'no-track-artist'}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.05 }}
-              className="text-base text-muted"
-            >
-              {track?.artists?.map((a: any) => a.name).join(', ')}
-            </motion.p>
-          </div>
+          {/* Track Info — hidden for YouTube since title is in YouTubeVideoInfo */}
+          {!playback.youtubeCurrentTrack && (
+            <div className="flex flex-col items-center gap-1 text-center">
+              <motion.h1
+                key={track?.name || 'no-track-name'}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="text-2xl font-bold text-text"
+              >
+                {track?.name || 'No track selected'}
+              </motion.h1>
+              <motion.p
+                key={track?.artists?.map((a: any) => a.name).join(', ') || 'no-track-artist'}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.05 }}
+                className="text-base text-muted"
+              >
+                {track?.artists?.map((a: any) => a.name).join(', ')}
+              </motion.p>
+            </div>
+          )}
 
           {/* Progress + Controls + Volume — hidden for YouTube since PlayerBar handles them */}
           {!playback.youtubeCurrentTrack && (
