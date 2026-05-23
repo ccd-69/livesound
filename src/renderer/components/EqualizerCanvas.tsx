@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
-import { getAnalyser } from '../lib/audioAnalyser';
+import { getAnalyser, startAudioCapture } from '../lib/audioAnalyser';
 
 interface EqualizerCanvasProps {
   barCount?: number;
@@ -86,6 +86,12 @@ export default function EqualizerCanvas({
 
     animRef.current = requestAnimationFrame(draw);
   }, [playback.isPlaying, barCount, height]);
+
+  useEffect(() => {
+    if (!getAnalyser()) {
+      startAudioCapture().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     animRef.current = requestAnimationFrame(draw);

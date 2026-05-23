@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
-import { getAnalyser, getSampleRate } from '../lib/audioAnalyser';
+import { getAnalyser, getSampleRate, startAudioCapture } from '../lib/audioAnalyser';
 
 interface SpectrumAnalyzerCanvasProps {
   barCount?: number;
@@ -108,6 +108,14 @@ export default function SpectrumAnalyzerCanvas({
 
     animRef.current = requestAnimationFrame(draw);
   }, [playback.isPlaying, barCount, height]);
+
+  // Start display-media audio capture if no analyser is available yet.
+  // This handles iframe/Spotify modes where connectAudioElement can't be used.
+  useEffect(() => {
+    if (!getAnalyser()) {
+      startAudioCapture().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     animRef.current = requestAnimationFrame(draw);

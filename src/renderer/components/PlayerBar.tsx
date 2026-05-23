@@ -12,7 +12,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { usePlayback } from '../hooks/usePlayback';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import EqualizerCanvas from './EqualizerCanvas';
 
 function formatTime(ms: number) {
@@ -26,7 +26,12 @@ function formatTime(ms: number) {
 export default function PlayerBar() {
   const playback = usePlayback();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showEqualizer, setShowEqualizer] = useState(false);
+
+  // Hide equalizer in PlayerBar when on NowPlaying screen — the spectrum
+  // analyzer is shown there instead. Keeps only one visualizer visible at a time.
+  const isNowPlaying = location.pathname === '/now-playing';
 
   useEffect(() => {
     function refresh() {
@@ -110,9 +115,9 @@ export default function PlayerBar() {
         />
       </div>
 
-      {/* Equalizer */}
+      {/* Equalizer — hidden on NowPlaying since the spectrum analyzer is shown there */}
       <AnimatePresence>
-        {showEqualizer && (
+        {showEqualizer && !isNowPlaying && (
           <motion.div
             initial={{ opacity: 0, width: 0 }}
             animate={{ opacity: 1, width: 'auto' }}

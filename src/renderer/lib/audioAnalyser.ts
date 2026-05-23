@@ -6,6 +6,7 @@ let silenceNode: GainNode | null = null;
 let mediaStream: MediaStream | null = null;
 let sourceNode: MediaStreamAudioSourceNode | null = null;
 let mediaElementSource: MediaElementAudioSourceNode | null = null;
+let connectedAudioEl: HTMLAudioElement | null = null;
 
 function ensureAudioGraph(sr: number) {
   if (audioCtx && analyser) return;
@@ -26,15 +27,35 @@ function ensureAudioGraph(sr: number) {
  * clean audio data, and instant connection.
  */
 export function connectAudioElement(audioEl: HTMLAudioElement): boolean {
-  if (captureStarted) return true;
+  // Already connected to this exact element
+  if (captureStarted && connectedAudioEl === audioEl) {
+    return true;
+  }
 
   try {
+    // If a different source is connected (display media or another audio element),
+    // disconnect it first so we can route the new element through the analyser.
+    if (sourceNode) {
+      try { sourceNode.disconnect(); } catch { /* ignore */ }
+      sourceNode = null;
+    }
+    if (mediaElementSource && connectedAudioEl && connectedAudioEl !== audioEl) {
+      try { mediaElementSource.disconnect(); } catch { /* ignore */ }
+      mediaElementSource = null;
+      connectedAudioEl = null;
+    }
+
     currentSampleRate = 48000;
     ensureAudioGraph(currentSampleRate);
 
     if (!audioCtx || !analyser) return false;
 
-    mediaElementSource = audioCtx.createMediaElementSource(audioEl);
+    // If no mediaElementSource exists yet, create one for this element
+    if (!mediaElementSource || connectedAudioEl !== audioEl) {
+      mediaElementSource = audioCtx.createMediaElementSource(audioEl);
+      connectedAudioEl = audioEl;
+    }
+
     mediaElementSource.connect(analyser);
     analyser.connect(silenceNode!);
 
@@ -53,9 +74,17 @@ export function connectAudioElement(audioEl: HTMLAudioElement): boolean {
  * Used for iframe/Spotify modes where we can't access the audio element.
  */
 export async function startAudioCapture(): Promise<boolean> {
-  if (captureStarted) return true;
+  if (captureStarted && mediaStream) return true;
 
   try {
+    // If an audio element was previously connected, disconnect it so we can
+    // route display media audio through the analyser instead.
+    if (mediaElementSource) {
+      try { mediaElementSource.disconnect(); } catch { /* ignore */ }
+      mediaElementSource = null;
+      connectedAudioEl = null;
+    }
+
     mediaStream = await navigator.mediaDevices.getDisplayMedia({
       audio: true,
       video: true,
@@ -98,19 +127,12 @@ export function getSampleRate(): number {
 
 export function stopAudioCapture() {
   if (mediaElementSource) {
-    try {
-      mediaElementSource.disconnect();
-    } catch {
-      // ignore
-    }
+    try { mediaElementSource.disconnect(); } catch { /* ignore */ }
     mediaElementSource = null;
+    connectedAudioEl = null;
   }
   if (sourceNode) {
-    try {
-      sourceNode.disconnect();
-    } catch {
-      // ignore
-    }
+    try { sourceNode.disconnect(); } catch { /* ignore */ }
     sourceNode = null;
   }
   if (mediaStream) {
@@ -118,19 +140,11 @@ export function stopAudioCapture() {
     mediaStream = null;
   }
   if (analyser) {
-    try {
-      analyser.disconnect();
-    } catch {
-      // ignore
-    }
+    try { analyser.disconnect(); } catch { /* ignore */ }
     analyser = null;
   }
   if (silenceNode) {
-    try {
-      silenceNode.disconnect();
-    } catch {
-      // ignore
-    }
+    try { silenceNode.disconnect(); } catch { /* ignore */ }
     silenceNode = null;
   }
   if (audioCtx) {
