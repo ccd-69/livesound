@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { usePlayback } from '../hooks/usePlayback';
 import { useNavigate } from 'react-router-dom';
-import AudioVisualizer from './AudioVisualizer';
+import EqualizerCanvas from './EqualizerCanvas';
 
 function formatTime(ms: number) {
   if (!ms || isNaN(ms)) return '0:00';
@@ -120,12 +120,7 @@ export default function PlayerBar() {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="flex items-center overflow-hidden"
           >
-            <AudioVisualizer
-              barCount={24}
-              barWidth={3}
-              barGap={2}
-              height={32}
-            />
+            <EqualizerCanvas barCount={24} height={32} />
           </motion.div>
         )}
       </AnimatePresence>

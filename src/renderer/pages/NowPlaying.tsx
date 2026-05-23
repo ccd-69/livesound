@@ -15,10 +15,9 @@ import {
   Music,
   MonitorPlay,
 } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
 import { getYouTubeVideoId, convertMusicUrlToYouTube } from '../lib/utils';
 import { usePlayback } from '../hooks/usePlayback';
-import { SpectrumAnalyzer } from '../components/AudioVisualizer';
+import SpectrumAnalyzerCanvas from '../components/SpectrumAnalyzerCanvas';
 import YouTubePlayer from '../components/YouTubePlayer';
 import DirectStreamPlayer from '../components/DirectStreamPlayer';
 import WebViewPlayer from '../components/WebViewPlayer';
@@ -105,39 +104,41 @@ export default function NowPlaying() {
 
           {/* Album Art / YouTube Player */}
           {playback.youtubeCurrentTrack ? (
-            <>
-              {playback.youtubeMode === 'iframe' && playback.youtubeCurrentTrack?.uri && (
-                <YouTubePlayer
-                  url={convertMusicUrlToYouTube(playback.youtubeCurrentTrack.uri)}
-                  playing={playback.isPlaying}
-                  className="w-full h-full"
-                />
-              )}
-              {playback.youtubeMode === 'direct-stream' && playback.youtubeCurrentTrack?.uri && (
-                <DirectStreamPlayer
-                  videoUrl={playback.youtubeCurrentTrack.uri}
-                  className="w-full h-full"
-                />
-              )}
-              {playback.youtubeMode === 'webview' && playback.youtubeCurrentTrack?.uri && (
-                <WebViewPlayer
-                  videoId={getYouTubeVideoId(playback.youtubeCurrentTrack.uri) || playback.youtubeCurrentTrack.videoId || playback.youtubeCurrentTrack.id}
-                  className="w-full h-full"
-                />
-              )}
-              {playback.youtubeMode === 'ytm-web' && (
-                <div className="flex flex-col items-center gap-3 rounded-xl bg-hover px-8 py-12 text-center">
-                  <MonitorPlay size={48} className="text-accent" />
-                  <p className="text-lg font-semibold text-text">
-                    {playback.isPlaying ? 'Playing in YouTube Music' : 'Paused in YouTube Music'}
-                  </p>
-                  <p className="text-sm text-muted">The full YouTube Music web player is active in the background.</p>
-                </div>
-              )}
+            <div className="flex flex-col items-center gap-4 w-full">
+              <div className="w-full max-h-[50vh] aspect-video rounded-xl overflow-hidden">
+                {playback.youtubeMode === 'iframe' && playback.youtubeCurrentTrack?.uri && (
+                  <YouTubePlayer
+                    url={convertMusicUrlToYouTube(playback.youtubeCurrentTrack.uri)}
+                    playing={playback.isPlaying}
+                    className="w-full h-full"
+                  />
+                )}
+                {playback.youtubeMode === 'direct-stream' && playback.youtubeCurrentTrack?.uri && (
+                  <DirectStreamPlayer
+                    videoUrl={playback.youtubeCurrentTrack.uri}
+                    className="w-full h-full"
+                  />
+                )}
+                {playback.youtubeMode === 'webview' && playback.youtubeCurrentTrack?.uri && (
+                  <WebViewPlayer
+                    videoId={getYouTubeVideoId(playback.youtubeCurrentTrack.uri) || playback.youtubeCurrentTrack.videoId || playback.youtubeCurrentTrack.id}
+                    className="w-full h-full"
+                  />
+                )}
+                {playback.youtubeMode === 'ytm-web' && (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-hover px-8 py-12 text-center h-full">
+                    <MonitorPlay size={48} className="text-accent" />
+                    <p className="text-lg font-semibold text-text">
+                      {playback.isPlaying ? 'Playing in YouTube Music' : 'Paused in YouTube Music'}
+                    </p>
+                    <p className="text-sm text-muted">The full YouTube Music web player is active in the background.</p>
+                  </div>
+                )}
+              </div>
               {playback.youtubeCurrentTrack?.id && playback.youtubeMode !== 'ytm-web' && (
                 <YouTubeVideoInfo videoId={playback.youtubeCurrentTrack.id} />
               )}
-            </>
+            </div>
           ) : (
             <>
               <motion.div
@@ -159,24 +160,15 @@ export default function NowPlaying() {
                   </div>
                 )}
               </motion.div>
-
             </>
           )}
 
           {/* Spectrum Analyzer — shows for all playback modes */}
-          <AnimatePresence>
-            {showSpectrum && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-                className="w-full flex justify-center"
-              >
-                <SpectrumAnalyzer barCount={64} barWidth={4} barGap={2} height={64} />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {showSpectrum && (
+            <div className="w-full px-2">
+              <SpectrumAnalyzerCanvas barCount={64} height={120} />
+            </div>
+          )}
 
           {/* Track Info — hidden for YouTube since title is in YouTubeVideoInfo */}
           {!playback.youtubeCurrentTrack && (

@@ -5,21 +5,62 @@ let currentSampleRate = 48000;
 let silenceNode: GainNode | null = null;
 let mediaStream: MediaStream | null = null;
 let sourceNode: MediaStreamAudioSourceNode | null = null;
+let mediaElementSource: MediaElementAudioSourceNode | null = null;
 
+function ensureAudioGraph(sr: number) {
+  if (audioCtx && analyser) return;
+
+  audioCtx = new AudioContext({ sampleRate: sr });
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 4096;
+  analyser.smoothingTimeConstant = 0.8;
+
+  silenceNode = audioCtx.createGain();
+  silenceNode.gain.value = 0;
+  silenceNode.connect(audioCtx.destination);
+}
+
+/**
+ * Connect an HTMLAudioElement directly to the analyser.
+ * This is the best approach for direct-stream mode — no screen share dialog,
+ * clean audio data, and instant connection.
+ */
+export function connectAudioElement(audioEl: HTMLAudioElement): boolean {
+  if (captureStarted) return true;
+
+  try {
+    currentSampleRate = 48000;
+    ensureAudioGraph(currentSampleRate);
+
+    if (!audioCtx || !analyser) return false;
+
+    mediaElementSource = audioCtx.createMediaElementSource(audioEl);
+    mediaElementSource.connect(analyser);
+    analyser.connect(silenceNode!);
+
+    audioCtx.resume().catch(() => {});
+    captureStarted = true;
+    console.log('[AudioAnalyser] Connected audio element');
+    return true;
+  } catch (err) {
+    console.error('[AudioAnalyser] Failed to connect audio element:', err);
+    return false;
+  }
+}
+
+/**
+ * Fallback: capture system audio via getDisplayMedia.
+ * Used for iframe/Spotify modes where we can't access the audio element.
+ */
 export async function startAudioCapture(): Promise<boolean> {
   if (captureStarted) return true;
 
   try {
-    // Use getDisplayMedia via Electron's setDisplayMediaRequestHandler.
-    // The main process provides a screen source with audio:'loopback',
-    // which captures system audio without the legacy getUserMedia crash.
     mediaStream = await navigator.mediaDevices.getDisplayMedia({
       audio: true,
       video: true,
     });
 
-    // We only need the audio track for the visualizer.
-    // Stop all video tracks immediately to avoid screen-recording UX side effects.
     mediaStream.getVideoTracks().forEach((track) => track.stop());
 
     const audioTrack = mediaStream.getAudioTracks()[0];
@@ -31,9 +72,7 @@ export async function startAudioCapture(): Promise<boolean> {
     currentSampleRate = 48000;
     ensureAudioGraph(currentSampleRate);
 
-    if (!audioCtx || !analyser) {
-      return false;
-    }
+    if (!audioCtx || !analyser) return false;
 
     sourceNode = audioCtx.createMediaStreamSource(mediaStream);
     sourceNode.connect(analyser);
@@ -49,19 +88,6 @@ export async function startAudioCapture(): Promise<boolean> {
   }
 }
 
-function ensureAudioGraph(sr: number) {
-  if (audioCtx && analyser) return;
-
-  audioCtx = new AudioContext({ sampleRate: sr });
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 16384;
-  analyser.smoothingTimeConstant = 0.8;
-
-  silenceNode = audioCtx.createGain();
-  silenceNode.gain.value = 0;
-  silenceNode.connect(audioCtx.destination);
-}
-
 export function getAnalyser(): AnalyserNode | null {
   return analyser;
 }
@@ -71,6 +97,14 @@ export function getSampleRate(): number {
 }
 
 export function stopAudioCapture() {
+  if (mediaElementSource) {
+    try {
+      mediaElementSource.disconnect();
+    } catch {
+      // ignore
+    }
+    mediaElementSource = null;
+  }
   if (sourceNode) {
     try {
       sourceNode.disconnect();

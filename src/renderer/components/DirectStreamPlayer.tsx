@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Play, Pause, Loader2, AlertCircle } from 'lucide-react';
 import { usePlayback } from '../hooks/usePlayback';
+import { connectAudioElement } from '../lib/audioAnalyser';
 
 interface DirectStreamPlayerProps {
   videoUrl: string;
@@ -84,6 +85,13 @@ export default function DirectStreamPlayer({
     }
     setPlaying(!playing);
   };
+
+  // Connect audio element to the visualizer analyser for real frequency data
+  useEffect(() => {
+    if (audioRef.current && streamUrl) {
+      connectAudioElement(audioRef.current);
+    }
+  }, [streamUrl]);
 
   if (loading) {
     return (
