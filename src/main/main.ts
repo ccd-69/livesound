@@ -1,8 +1,4 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net, desktopCapturer } from 'electron';
-import { setupAudioCaptureIpc } from 'process-audio-capture/dist/main.js';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { audioCapture } = require('process-audio-capture/dist/index.js') as typeof import('process-audio-capture/dist/index.js');
 import http from 'http';
 import fs from 'fs';
 import os from 'os';
@@ -92,13 +88,6 @@ function destroyTray() {
   }
 }
 
-function stopAudioCapture() {
-  try {
-    if (audioCapture?.isCapturing) {
-      audioCapture.stopCapture();
-    }
-  } catch {}
-}
 
 let staticServerPort = 0;
 
@@ -194,15 +183,16 @@ async function createWindow() {
     }
   });
 
-  // Security: restrict permission requests (e.g. openExternal) from renderer
+  // Security: restrict permission requests from renderer.
+  // Allow fullscreen and media (required for the audio visualizer via getDisplayMedia).
+  // display-capture may be requested on some platforms before getDisplayMedia proceeds.
   mainWindow.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(permission === 'fullscreen');
+    callback(permission === 'fullscreen' || permission === 'media' || permission === 'display-capture');
   });
 
   mainWindow.on('closed', () => {
     destroyYtmView();
-    stopAudioCapture();
-    mainWindow = null;
+        mainWindow = null;
   });
 
   // Resize YouTube Music view when window resizes
@@ -220,8 +210,7 @@ async function createWindow() {
   // Fully close app when window is closed (do not minimize to tray)
   mainWindow.on('close', () => {
     destroyYtmView();
-    stopAudioCapture();
-  });
+      });
 
   // Sync when window is shown from tray/minimized
   mainWindow.on('show', async () => {
@@ -381,8 +370,18 @@ app.whenReady().then(async () => {
     console.log(`[Optimize] Updated ${cacheResult.previousVersion} -> ${cacheResult.currentVersion}, caches cleared`);
   }
 
-  // Setup per-process audio capture IPC for the visualizer
-  setupAudioCaptureIpc();
+  // Set up display media request handler for audio visualizer.
+  // Uses a screen source with audio loopback so the renderer can capture
+  // system audio via getDisplayMedia (avoids the legacy getUserMedia crash on Windows 11).
+  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+    desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).then((sources) => {
+      if (sources.length > 0) {
+        callback({ video: sources[0], audio: 'loopback' });
+      } else {
+        callback({});
+      }
+    });
+  }, { useSystemPicker: false });
 
   // Restore saved credentials into auth modules on startup
   const startupSettings = loadSettings();
@@ -510,8 +509,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   globalShortcut.unregisterAll();
   destroyYtmView();
-  stopAudioCapture();
-  if (isDev || process.platform !== 'darwin') {
+    if (isDev || process.platform !== 'darwin') {
     // In dev mode, quit immediately so leftover processes don't accumulate
     // On Windows/Linux quit when all windows are closed
     destroyTray();
@@ -522,8 +520,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   globalShortcut.unregisterAll();
   destroyYtmView();
-  stopAudioCapture();
-  destroyTray();
+    destroyTray();
 });
 
 // Settings IPC
@@ -718,20 +715,6 @@ ipcMain.handle('clear-cache', () => {
 
 // App info
 ipcMain.handle('get-app-version', () => app.getVersion());
-ipcMain.handle('get-app-pid', () => process.pid);
-ipcMain.handle('get-renderer-pid', () => {
-  // Return the main renderer process PID (where iframe/direct-stream audio plays).
-  // If a ytmView WebContentsView is active, prefer its PID since audio may
-  // be isolated to that renderer process.
-  if (ytmView) {
-    try {
-      return ytmView.webContents.getOSProcessId();
-    } catch {
-      /* fall through */
-    }
-  }
-  return mainWindow?.webContents.getOSProcessId() ?? process.pid;
-});
 
 // Update IPC
 ipcMain.handle('get-update-status', () => updater.getStatus());

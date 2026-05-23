@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS = {
   volume: 0.8,
   spotifyConnected: false,
   youtubeConnected: false,
+  showEqualizer: false,
+  showSpectrumAnalyzer: false,
   youtubePlaybackMode: 'iframe' as 'iframe' | 'ytm-web' | 'direct-stream' | 'webview',
 };
 

@@ -1,72 +1,47 @@
 let audioCtx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
-let workletNode: AudioWorkletNode | null = null;
 let captureStarted = false;
 let currentSampleRate = 48000;
-let unsubscribeAudioData: (() => void) | null = null;
 let silenceNode: GainNode | null = null;
-
-function getCaptureApi() {
-  return window.electronAPI?.processAudioCapture ?? null;
-}
-
-const WORKLET_CODE = `
-class PcmFeed extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this.queue = [];
-    this.readIdx = 0;
-    this.current = null;
-    this.port.onmessage = (e) => {
-      this.queue.push(e.data);
-    };
-  }
-  process(inputs, outputs) {
-    const out = outputs[0];
-    if (!out || out.length === 0) return true;
-    const len = out[0].length;
-    for (let i = 0; i < len; i++) {
-      if (!this.current || this.readIdx >= this.current.length) {
-        this.current = this.queue.shift();
-        this.readIdx = 0;
-      }
-      const v = this.current ? this.current[this.readIdx++] : 0;
-      for (let c = 0; c < out.length; c++) out[c][i] = v;
-    }
-    return true;
-  }
-}
-registerProcessor('pcm-feed', PcmFeed);
-`;
+let mediaStream: MediaStream | null = null;
+let sourceNode: MediaStreamAudioSourceNode | null = null;
 
 export async function startAudioCapture(): Promise<boolean> {
   if (captureStarted) return true;
-  const api = getCaptureApi();
-  if (!api) return false;
 
   try {
-    const supported = await api.isPlatformSupported();
-    if (!supported) return false;
+    // Use getDisplayMedia via Electron's setDisplayMediaRequestHandler.
+    // The main process provides a screen source with audio:'loopback',
+    // which captures system audio without the legacy getUserMedia crash.
+    mediaStream = await navigator.mediaDevices.getDisplayMedia({
+      audio: true,
+      video: true,
+    });
 
-    // Use renderer PID instead of browser PID — audio plays in renderer process
-    const pid = await window.electronAPI.getRendererPid?.();
-    if (!pid) {
-      console.error('[AudioAnalyser] No renderer PID available');
+    // We only need the audio track for the visualizer.
+    // Stop all video tracks immediately to avoid screen-recording UX side effects.
+    mediaStream.getVideoTracks().forEach((track) => track.stop());
+
+    const audioTrack = mediaStream.getAudioTracks()[0];
+    if (!audioTrack) {
+      console.error('[AudioAnalyser] No audio track in display media stream');
       return false;
     }
 
-    const ok = await api.startCapture(pid);
-    if (!ok) return false;
+    currentSampleRate = 48000;
+    ensureAudioGraph(currentSampleRate);
 
+    if (!audioCtx || !analyser) {
+      return false;
+    }
+
+    sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+    sourceNode.connect(analyser);
+    analyser.connect(silenceNode!);
+
+    await audioCtx.resume();
     captureStarted = true;
-
-    unsubscribeAudioData = api.on('audio-data', (audioData: any) => {
-      if (!audioData?.buffer) return;
-      currentSampleRate = audioData.sampleRate || 48000;
-      ensureAudioGraph(currentSampleRate);
-      feedPcm(audioData.buffer, audioData.channels || 1);
-    });
-
+    console.log('[AudioAnalyser] Display audio capture started');
     return true;
   } catch (err) {
     console.error('[AudioAnalyser] Capture failed:', err);
@@ -82,32 +57,9 @@ function ensureAudioGraph(sr: number) {
   analyser.fftSize = 16384;
   analyser.smoothingTimeConstant = 0.8;
 
-  // Sink audio to a zero-gain node so the graph processes without
-  // routing captured audio back to the speakers (feedback loop).
   silenceNode = audioCtx.createGain();
   silenceNode.gain.value = 0;
   silenceNode.connect(audioCtx.destination);
-
-  const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
-  const url = URL.createObjectURL(blob);
-  audioCtx.audioWorklet.addModule(url).then(() => {
-    workletNode = new AudioWorkletNode(audioCtx!, 'pcm-feed');
-    workletNode.connect(analyser!);
-    analyser!.connect(silenceNode!);
-    URL.revokeObjectURL(url);
-
-    // Resume context — browsers start it suspended until user interaction
-    audioCtx!.resume().catch(() => {});
-  });
-}
-
-function feedPcm(interleaved: Float32Array, channels: number) {
-  if (!workletNode) return;
-  const mono = new Float32Array(Math.floor(interleaved.length / channels));
-  for (let i = 0; i < mono.length; i++) {
-    mono[i] = interleaved[i * channels];
-  }
-  workletNode.port.postMessage(mono);
 }
 
 export function getAnalyser(): AnalyserNode | null {
@@ -119,28 +71,36 @@ export function getSampleRate(): number {
 }
 
 export function stopAudioCapture() {
-  const api = getCaptureApi();
-  if (unsubscribeAudioData) {
-    unsubscribeAudioData();
-    unsubscribeAudioData = null;
+  if (sourceNode) {
+    try {
+      sourceNode.disconnect();
+    } catch {
+      // ignore
+    }
+    sourceNode = null;
   }
-  if (api) {
-    api.stopCapture();
-  }
-  if (workletNode) {
-    workletNode.disconnect();
-    workletNode = null;
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
   }
   if (analyser) {
-    analyser.disconnect();
+    try {
+      analyser.disconnect();
+    } catch {
+      // ignore
+    }
     analyser = null;
   }
   if (silenceNode) {
-    silenceNode.disconnect();
+    try {
+      silenceNode.disconnect();
+    } catch {
+      // ignore
+    }
     silenceNode = null;
   }
   if (audioCtx) {
-    audioCtx.close();
+    audioCtx.close().catch(() => {});
     audioCtx = null;
   }
   captureStarted = false;
