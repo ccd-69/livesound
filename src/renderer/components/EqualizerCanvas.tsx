@@ -11,7 +11,7 @@ interface EqualizerCanvasProps {
 function generateIdleBars(count: number, t: number): number[] {
   return Array.from({ length: count }, (_, i) => {
     const phase = i / count * Math.PI * 2;
-    return 0.1 + 0.15 * Math.abs(Math.sin(t * 0.6 + phase));
+    return 0.15 + 0.25 * Math.abs(Math.sin(t * 0.6 + phase));
   });
 }
 
@@ -28,6 +28,28 @@ function mapFreqToBars(freqData: Uint8Array, barCount: number): number[] {
   return bars;
 }
 
+/** Draw a rounded-top rect manually (safe fallback for older Chromium). */
+function drawRoundedTopRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
 export default function EqualizerCanvas({
   barCount = 24,
   height = 32,
@@ -38,50 +60,59 @@ export default function EqualizerCanvas({
   const playback = usePlayback();
 
   const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const w = rect.width;
-    const h = rect.height;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
 
-    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      ctx.scale(dpr, dpr);
-    }
+      if (w < 1 || h < 1) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
 
-    ctx.clearRect(0, 0, w, h);
+      const targetWidth = Math.floor(w * dpr);
+      const targetHeight = Math.floor(h * dpr);
+      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const analyser = getAnalyser();
-    let bars: number[];
+      ctx.clearRect(0, 0, w, h);
 
-    if (playback.isPlaying && analyser) {
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(data);
-      bars = mapFreqToBars(data, barCount);
-    } else {
-      bars = generateIdleBars(barCount, Date.now() / 1000);
-    }
+      const analyser = getAnalyser();
+      let bars: number[];
 
-    const gap = 2;
-    const totalGap = (barCount - 1) * gap;
-    const barWidth = (w - totalGap) / barCount;
-    const radius = barWidth / 2;
+      if (playback.isPlaying && analyser) {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        bars = mapFreqToBars(data, barCount);
+      } else {
+        bars = generateIdleBars(barCount, Date.now() / 1000);
+      }
 
-    for (let i = 0; i < barCount; i++) {
-      const value = bars[i];
-      const barH = Math.max(2, value * h);
-      const x = i * (barWidth + gap);
-      const y = h - barH;
+      const gap = 2;
+      const totalGap = (barCount - 1) * gap;
+      const barWidth = Math.max(1, (w - totalGap) / barCount);
+      const radius = Math.max(1, barWidth / 2);
 
-      ctx.fillStyle = 'var(--accent-color, #1db954)';
-      ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, barH, [radius, radius, 0, 0]);
-      ctx.fill();
+      for (let i = 0; i < barCount; i++) {
+        const value = bars[i];
+        const barH = Math.max(3, value * h * 0.95);
+        const x = i * (barWidth + gap);
+        const y = h - barH;
+
+        ctx.fillStyle = 'var(--accent-color, #1db954)';
+        drawRoundedTopRect(ctx, x, y, barWidth, barH, radius);
+      }
+    } catch (err) {
+      console.error('[EqualizerCanvas] Draw error:', err);
     }
 
     animRef.current = requestAnimationFrame(draw);
@@ -89,7 +120,9 @@ export default function EqualizerCanvas({
 
   useEffect(() => {
     if (!getAnalyser()) {
-      startAudioCapture().catch(() => {});
+      startAudioCapture().catch((e) => {
+        console.error('[EqualizerCanvas] startAudioCapture failed:', e);
+      });
     }
   }, []);
 

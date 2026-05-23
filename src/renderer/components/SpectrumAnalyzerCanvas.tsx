@@ -35,6 +35,28 @@ function mapFrequencyToBars(
   return bars;
 }
 
+/** Draw a rounded-top rect manually (safe fallback for older Chromium). */
+function drawRoundedTopRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
 export default function SpectrumAnalyzerCanvas({
   barCount = 64,
   height = 120,
@@ -45,75 +67,86 @@ export default function SpectrumAnalyzerCanvas({
   const playback = usePlayback();
 
   const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const w = rect.width;
-    const h = rect.height;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
 
-    // Resize canvas for DPR
-    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      ctx.scale(dpr, dpr);
-    }
+      // Guard against zero-size canvas (flex layout not yet settled)
+      if (w < 1 || h < 1) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
 
-    ctx.clearRect(0, 0, w, h);
+      // Resize backing store for DPR; reset transform first so we don't accumulate scales
+      const targetWidth = Math.floor(w * dpr);
+      const targetHeight = Math.floor(h * dpr);
+      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const analyser = getAnalyser();
-    let bars: number[];
+      // Dark translucent background so the canvas is always visible even when idle
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(0, 0, w, h);
 
-    if (playback.isPlaying && analyser) {
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      analyser.getByteFrequencyData(dataArray);
-      bars = mapFrequencyToBars(dataArray, barCount, getSampleRate());
-    } else {
-      // Idle animation — gentle sine waves
-      const t = Date.now() / 1000;
-      bars = Array.from({ length: barCount }, (_, i) => {
-        const phase = i / barCount * Math.PI * 2;
-        return 0.05 + 0.08 * Math.abs(Math.sin(t * 0.8 + phase));
-      });
-    }
+      const analyser = getAnalyser();
+      let bars: number[];
 
-    const gap = 2;
-    const totalGap = (barCount - 1) * gap;
-    const barWidth = (w - totalGap) / barCount;
-    const radius = barWidth / 2;
+      if (playback.isPlaying && analyser) {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(dataArray);
+        bars = mapFrequencyToBars(dataArray, barCount, getSampleRate());
+      } else {
+        // Idle animation — gentle sine waves (more visible than before)
+        const t = Date.now() / 1000;
+        bars = Array.from({ length: barCount }, (_, i) => {
+          const phase = i / barCount * Math.PI * 2;
+          return 0.12 + 0.2 * Math.abs(Math.sin(t * 0.8 + phase));
+        });
+      }
 
-    for (let i = 0; i < barCount; i++) {
-      const value = bars[i];
-      const barH = Math.max(2, value * h);
-      const x = i * (barWidth + gap);
-      const y = h - barH;
+      const gap = 2;
+      const totalGap = (barCount - 1) * gap;
+      const barWidth = Math.max(1, (w - totalGap) / barCount);
+      const radius = Math.max(1, barWidth / 2);
 
-      // Gradient: green → yellow → orange → red (based on height)
-      const hue = 140 - value * 100; // 140 (green) down to 40 (orange-red)
-      const lightness = 45 + value * 25;
-      const alpha = 0.5 + value * 0.5;
+      for (let i = 0; i < barCount; i++) {
+        const value = bars[i];
+        const barH = Math.max(3, value * h * 0.95); // leave a tiny bottom margin
+        const x = i * (barWidth + gap);
+        const y = h - barH;
 
-      ctx.fillStyle = `hsla(${hue}, 80%, ${lightness}%, ${alpha})`;
+        // Gradient: green → yellow → orange → red (based on height)
+        const hue = 140 - value * 100; // 140 (green) down to 40 (orange-red)
+        const lightness = 45 + value * 25;
+        const alpha = 0.6 + value * 0.4;
 
-      // Draw rounded rect
-      ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, barH, [radius, radius, 0, 0]);
-      ctx.fill();
+        ctx.fillStyle = `hsla(${hue}, 80%, ${lightness}%, ${alpha})`;
+        drawRoundedTopRect(ctx, x, y, barWidth, barH, radius);
+      }
+    } catch (err) {
+      console.error('[SpectrumAnalyzerCanvas] Draw error:', err);
     }
 
     animRef.current = requestAnimationFrame(draw);
   }, [playback.isPlaying, barCount, height]);
 
   // Start display-media audio capture if no analyser is available yet.
-  // This handles iframe/Spotify modes where connectAudioElement can't be used.
   useEffect(() => {
     if (!getAnalyser()) {
-      startAudioCapture().catch(() => {});
+      startAudioCapture().catch((e) => {
+        console.error('[SpectrumAnalyzerCanvas] startAudioCapture failed:', e);
+      });
     }
   }, []);
 
@@ -127,7 +160,7 @@ export default function SpectrumAnalyzerCanvas({
   return (
     <canvas
       ref={canvasRef}
-      className={`w-full ${className}`}
+      className={`w-full min-w-[200px] ${className}`}
       style={{ height }}
     />
   );
