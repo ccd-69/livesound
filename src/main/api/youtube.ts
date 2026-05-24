@@ -241,6 +241,16 @@ export async function addVideoToPlaylist(playlistId: string, videoId: string): P
   if (!res.ok) throw new Error(`Add to playlist failed: ${res.status}`);
 }
 
+function parseISODuration(iso: string): number {
+  if (!iso) return 0;
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1] || '0', 10);
+  const minutes = parseInt(match[2] || '0', 10);
+  const seconds = parseInt(match[3] || '0', 10);
+  return ((hours * 60 + minutes) * 60 + seconds) * 1000;
+}
+
 export async function getVideoDetails(videoId: string): Promise<any> {
   const token = await youtubeAuth.getValidAccessToken();
   const res = await fetch(
@@ -251,6 +261,7 @@ export async function getVideoDetails(videoId: string): Promise<any> {
   const data = await res.json();
   const item = data.items?.[0];
   if (!item) return null;
+  const durationIso = item.contentDetails?.duration || '';
   return {
     id: item.id,
     title: item.snippet?.title || '',
@@ -260,6 +271,7 @@ export async function getVideoDetails(videoId: string): Promise<any> {
     viewCount: item.statistics?.viewCount || '0',
     likeCount: item.statistics?.likeCount || '0',
     commentCount: item.statistics?.commentCount || '0',
+    durationMs: parseISODuration(durationIso),
   };
 }
 

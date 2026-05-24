@@ -18,7 +18,7 @@ export default function WebViewPlayer({
     const webview = webviewRef.current;
     if (!webview) return;
 
-    const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0`;
+    const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&controls=1`;
     webview.src = src;
 
     const handleLoaded = () => {
@@ -60,6 +60,23 @@ export default function WebViewPlayer({
           if (video) video.currentTime = ${seconds};
         `).catch(() => {});
       },
+      getTime: async () => {
+        try {
+          const result = await webviewRef.current?.executeJavaScript(`
+            (() => {
+              const v = document.querySelector('video');
+              return v ? { currentTime: v.currentTime, duration: v.duration } : null;
+            })()
+          `);
+          if (!result) return null;
+          return {
+            currentTime: (result.currentTime || 0) * 1000,
+            duration: (result.duration || 0) * 1000,
+          };
+        } catch {
+          return null;
+        }
+      },
     };
     playback.setYoutubeController(controller);
     return () => {
@@ -72,7 +89,7 @@ export default function WebViewPlayer({
       {/* @ts-ignore - webview tag is enabled in Electron */}
       <webview
         ref={webviewRef}
-        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&modestbranding=1&rel=0`}
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&controls=1`}
         style={{
           display: 'inline-flex',
           width: '100%',

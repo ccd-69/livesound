@@ -28,15 +28,17 @@ export default function PlayerBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showEqualizer, setShowEqualizer] = useState(false);
+  const [showSpectrum, setShowSpectrum] = useState(false);
 
-  // Hide equalizer in PlayerBar when on NowPlaying screen — the spectrum
-  // analyzer is shown there instead. Keeps only one visualizer visible at a time.
+  // Hide equalizer in PlayerBar only when on NowPlaying screen AND the
+  // spectrum analyzer is enabled there. Otherwise the user sees no visualizer.
   const isNowPlaying = location.pathname === '/now-playing';
 
   useEffect(() => {
     function refresh() {
       window.electronAPI.getSettings().then((s: any) => {
         setShowEqualizer(s.showEqualizer ?? false);
+        setShowSpectrum(s.showSpectrumAnalyzer ?? false);
       });
     }
     refresh();
@@ -115,9 +117,9 @@ export default function PlayerBar() {
         />
       </div>
 
-      {/* Equalizer — hidden on NowPlaying since the spectrum analyzer is shown there */}
+      {/* Equalizer — hidden on NowPlaying only when spectrum analyzer is enabled there */}
       <AnimatePresence>
-        {showEqualizer && !isNowPlaying && (
+        {showEqualizer && !(isNowPlaying && showSpectrum) && (
           <motion.div
             initial={{ opacity: 0, width: 0 }}
             animate={{ opacity: 1, width: 'auto' }}

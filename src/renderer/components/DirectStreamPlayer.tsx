@@ -69,6 +69,15 @@ export default function DirectStreamPlayer({
           audioRef.current.currentTime = seconds;
         }
       },
+      getTime: () => {
+        if (!audioRef.current) return null;
+        const currentTime = audioRef.current.currentTime * 1000;
+        const duration = audioRef.current.duration * 1000;
+        return {
+          currentTime,
+          duration: isNaN(duration) ? 0 : duration,
+        };
+      },
     };
     playback.setYoutubeController(controller);
     return () => {

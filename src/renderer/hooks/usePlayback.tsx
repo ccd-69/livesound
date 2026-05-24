@@ -6,6 +6,7 @@ export interface YoutubeController {
   play: () => void;
   pause: () => void;
   seek?: (seconds: number) => void;
+  getTime?: () => { currentTime: number; duration: number } | null | Promise<{ currentTime: number; duration: number } | null>;
 }
 
 export type RepeatMode = 'off' | 'loop' | 'loop-single' | 'shuffle';
@@ -49,6 +50,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const [youtubeQueue, setYoutubeQueueState] = useState<any[]>([]);
   const [youtubeQueueIndex, setYoutubeQueueIndex] = useState<number>(0);
+  const [youtubeProgress, setYoutubeProgress] = useState<number>(0);
+  const [youtubeDuration, setYoutubeDuration] = useState<number>(0);
   const youtubeControllerRef = useRef<YoutubeController | null>(null);
 
   useEffect(() => {
@@ -164,7 +167,20 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         }
 
         setYoutubeCurrentTrack(track);
+        setYoutubeProgress(0);
+        setYoutubeDuration(track?.durationMs || 0);
         const videoId = track.videoId || track.id;
+
+        // Fetch accurate duration from YouTube API if not present
+        if (videoId && !track?.durationMs) {
+          window.electronAPI.youtubeVideoDetails(videoId).then((details: any) => {
+            if (details?.durationMs) {
+              setYoutubeDuration(details.durationMs);
+            }
+          }).catch(() => {
+            // ignore duration fetch errors
+          });
+        }
 
         switch (youtubeMode) {
           case 'ytm-web': {
@@ -264,7 +280,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   const seek = useCallback(
     (ms: number) => {
-      spotify.seek(ms);
+      if (youtubeControllerRef.current?.seek) {
+        youtubeControllerRef.current.seek(ms / 1000);
+        setYoutubeProgress(ms);
+      } else {
+        spotify.seek(ms);
+      }
     },
     [spotify]
   );
@@ -283,6 +304,30 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }
     setIsYouTubePlaying(false);
   }, []);
+
+  // Poll YouTube controllers for accurate progress; fallback to local timer
+  useEffect(() => {
+    if (!youtubeCurrentTrack) return;
+    const interval = setInterval(() => {
+      const ctrl = youtubeControllerRef.current;
+      if (ctrl?.getTime) {
+        Promise.resolve(ctrl.getTime()).then((time) => {
+          if (time) {
+            setYoutubeProgress(time.currentTime);
+            if (time.duration > 0) setYoutubeDuration(time.duration);
+          }
+        }).catch(() => {
+          // ignore controller errors
+        });
+      } else if (isYouTubePlaying) {
+        setYoutubeProgress((prev) => {
+          const next = prev + 500;
+          return youtubeDuration > 0 && next > youtubeDuration ? youtubeDuration : next;
+        });
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [youtubeCurrentTrack, isYouTubePlaying, youtubeDuration]);
 
   // Keep refs to the latest callbacks so media-key subscriptions don't stale-close
   const callbacksRef = useRef({ play, pause, toggle, next, previous });
@@ -350,11 +395,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const isSpotifyPlaying = !spotify.paused && !!spotify.currentTrack;
   const activeTrack = isSpotifyPlaying ? spotify.currentTrack : (youtubeCurrentTrack || spotify.currentTrack);
 
+  const isYouTubeActive = !!youtubeCurrentTrack;
   const value: PlaybackState = {
     isPlaying: isSpotifyPlaying || isYouTubePlaying,
     currentTrack: activeTrack,
-    progress: isSpotifyPlaying ? spotify.position : 0,
-    duration: isSpotifyPlaying ? spotify.duration : 0,
+    progress: isSpotifyPlaying ? spotify.position : (isYouTubeActive ? youtubeProgress : 0),
+    duration: isSpotifyPlaying ? spotify.duration : (isYouTubeActive ? youtubeDuration : 0),
     volume,
     youtubeMode,
     youtubeCurrentTrack,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
 
 interface YouTubePlayerProps {
@@ -13,120 +13,200 @@ function getYouTubeVideoId(uri: string): string | null {
   return m ? m[1] : null;
 }
 
+/** Load the YouTube IFrame API once globally. */
+function loadYouTubeAPI(): Promise<any> {
+  return new Promise((resolve) => {
+    const w = window as any;
+    if (w.YT && w.YT.Player) {
+      resolve(w.YT);
+      return;
+    }
+    if (!w._ytApiPromises) w._ytApiPromises = [];
+    w._ytApiPromises.push(resolve);
+
+    // Already injecting — just wait for the shared callback
+    if (document.querySelector('script[src*="youtube.com/iframe_api"]')) return;
+
+    const existingReady = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => {
+      if (existingReady) existingReady();
+      w._ytApiPromises?.forEach((r: any) => r(w.YT));
+      w._ytApiPromises = [];
+    };
+
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScript = document.getElementsByTagName('script')[0];
+    firstScript.parentNode?.insertBefore(tag, firstScript);
+  });
+}
+
 export default function YouTubePlayer({
   url,
+  playing = true,
   className = '',
 }: YouTubePlayerProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [iframeError, setIframeError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<any>(null);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
   const playback = usePlayback();
 
-  const videoId = useMemo(() => getYouTubeVideoId(url), [url]);
+  const videoId = getYouTubeVideoId(url);
 
-  const embedUrl = useMemo(() => {
-    if (!videoId) return '';
-    const params = new URLSearchParams();
-    params.set('autoplay', '1');
-    params.set('modestbranding', '1');
-    params.set('rel', '0');
-    params.set('playsinline', '1');
-    params.set('enablejsapi', '1');
-    params.set('controls', '0');
-    params.set('disablekb', '1');
-    params.set('origin', window.location.origin);
-    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
-  }, [videoId]);
-
-  // Listen for iframe errors (age-restricted, copyright, etc.)
+  // Create / recreate the YT.Player when videoId changes
   useEffect(() => {
-    if (!videoId) return;
-    setIframeError(null);
-    setIframeLoaded(false);
+    if (!videoId || !containerRef.current) return;
+    setPlayerReady(false);
+    setPlayerError(null);
 
-    const handleMessage = (event: MessageEvent) => {
-      if (!event.origin.includes('youtube.com')) return;
-      try {
-        const data = JSON.parse(event.data);
-        if (data.event === 'onError') {
-          const code = data.info;
-          // 101 = not embeddable, 150 = same + age-restricted
-          if (code === 101 || code === 150) {
-            setIframeError('This video is age-restricted or cannot be embedded. Switch to Direct Stream mode in Settings to play it.');
-          } else if (code === 100) {
-            setIframeError('This video is private or has been removed.');
-          } else {
-            setIframeError(`Video playback error (${code}).`);
-          }
-        } else if (data.event === 'onReady') {
-          setIframeLoaded(true);
+    let cancelled = false;
+
+    loadYouTubeAPI().then((YT) => {
+      if (cancelled) return;
+
+      const player = new YT.Player(containerRef.current!, {
+        videoId,
+        playerVars: {
+          autoplay: playing ? 1 : 0,
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 1,
+          iv_load_policy: 3,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: () => {
+            if (!cancelled) setPlayerReady(true);
+          },
+          onStateChange: (event: any) => {
+            // Track local play state so the UI stays in sync
+            // YT.PlayerState: UNSTARTED=-1, ENDED=0, PLAYING=1, PAUSED=2, BUFFERING=3, CUED=5
+            if (event.data === 0) {
+              // ended
+              if (playback.repeatMode === 'loop-single') {
+                player.seekTo(0, true);
+                player.playVideo();
+              } else {
+                playback.next();
+              }
+            }
+          },
+          onError: (event: any) => {
+            const code = event.data;
+            if (code === 101 || code === 150) {
+              setPlayerError(
+                'This video is age-restricted or cannot be embedded. Switch to Direct Stream mode in Settings to play it.',
+              );
+            } else if (code === 100) {
+              setPlayerError('This video is private or has been removed.');
+            } else {
+              setPlayerError(`Video playback error (${code}).`);
+            }
+          },
+        },
+      });
+
+      playerRef.current = player;
+    });
+
+    return () => {
+      cancelled = true;
+      setPlayerReady(false);
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore non-JSON messages
+        playerRef.current = null;
       }
     };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
   }, [videoId]);
 
-  // Register controller so global play/pause controls work for iframe mode
+  // Sync the "playing" prop if it changes after mount
   useEffect(() => {
-    if (!videoId) return;
+    if (!playerReady || !playerRef.current) return;
+    try {
+      if (playing) {
+        playerRef.current.playVideo();
+      } else {
+        playerRef.current.pauseVideo();
+      }
+    } catch {
+      // ignore
+    }
+  }, [playing, playerReady]);
+
+  // Register controller so global play/pause/seek/progress work
+  useEffect(() => {
+    if (!videoId || !playerReady) return;
+
     const controller = {
       play: () => {
-        const iframe = iframeRef.current;
-        if (!iframe?.contentWindow) return;
-        iframe.contentWindow.postMessage(
-          JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
-          '*'
-        );
+        try {
+          playerRef.current?.playVideo();
+        } catch {}
       },
       pause: () => {
-        const iframe = iframeRef.current;
-        if (!iframe?.contentWindow) return;
-        iframe.contentWindow.postMessage(
-          JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-          '*'
-        );
+        try {
+          playerRef.current?.pauseVideo();
+        } catch {}
       },
       seek: (seconds: number) => {
-        const iframe = iframeRef.current;
-        if (!iframe?.contentWindow) return;
-        iframe.contentWindow.postMessage(
-          JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true] }),
-          '*'
-        );
+        try {
+          playerRef.current?.seekTo(seconds, true);
+        } catch {}
+      },
+      getTime: () => {
+        try {
+          const currentTime = playerRef.current?.getCurrentTime?.() || 0;
+          const duration = playerRef.current?.getDuration?.() || 0;
+          return {
+            currentTime: currentTime * 1000,
+            duration: duration * 1000,
+          };
+        } catch {
+          return null;
+        }
       },
     };
+
     playback.setYoutubeController(controller);
     return () => {
       playback.setYoutubeController(null);
     };
-  }, [videoId, playback.setYoutubeController]);
+  }, [videoId, playerReady, playback.setYoutubeController]);
+
+  async function switchToDirectStream() {
+    const s = await window.electronAPI.getSettings();
+    await window.electronAPI.saveSettings({
+      ...s,
+      youtubePlaybackMode: 'direct-stream',
+    });
+    window.location.reload();
+  }
 
   if (!videoId) {
     return (
-      <div className={`flex items-center justify-center rounded-xl bg-black px-6 py-12 text-muted ${className}`}>
+      <div
+        className={`flex items-center justify-center rounded-xl bg-black px-6 py-12 text-muted ${className}`}
+      >
         <span className="text-sm">Invalid YouTube URL</span>
       </div>
     );
   }
 
-  async function switchToDirectStream() {
-    const s = await window.electronAPI.getSettings();
-    await window.electronAPI.saveSettings({ ...s, youtubePlaybackMode: 'direct-stream' });
-    // Reload the page so the new mode takes effect
-    window.location.reload();
-  }
-
   return (
     <div className={`relative flex flex-col items-center gap-2 ${className}`}>
-      <div className="relative w-full overflow-hidden rounded-xl bg-black shadow-lg" style={{ aspectRatio: '16/9' }}>
-        {iframeError && (
+      <div
+        className="relative w-full overflow-hidden rounded-xl bg-black shadow-lg"
+        style={{ aspectRatio: '16/9' }}
+      >
+        {playerError && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
-            <span className="text-sm text-red-400">{iframeError}</span>
-            {iframeError.includes('age-restricted') && (
+            <span className="text-sm text-red-400">{playerError}</span>
+            {playerError.includes('age-restricted') && (
               <button
                 onClick={switchToDirectStream}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
@@ -136,22 +216,16 @@ export default function YouTubePlayer({
             )}
           </div>
         )}
-        {!iframeLoaded && !iframeError && (
+        {!playerReady && !playerError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center text-muted">
             <span className="text-sm">Loading video...</span>
           </div>
         )}
-        <iframe
-          ref={iframeRef}
-          src={embedUrl}
-          allow="autoplay; encrypted-media; picture-in-picture"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-          className="h-full w-full border-0"
-          onLoad={() => setIframeLoaded(true)}
+        <div
+          ref={containerRef}
+          className="h-full w-full [&>iframe]:h-full [&>iframe]:w-full"
         />
       </div>
-
     </div>
   );
 }
