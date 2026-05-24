@@ -94,9 +94,8 @@ export default function SpectrumAnalyzerCanvas({
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Dark translucent background so the canvas is always visible even when idle
-      ctx.fillStyle = 'rgba(0,0,0,0.25)';
-      ctx.fillRect(0, 0, w, h);
+      // Transparent clear — only the bars are drawn, background shows through
+      ctx.clearRect(0, 0, w, h);
 
       const analyser = getAnalyser();
       let bars: number[];
@@ -161,7 +160,7 @@ export default function SpectrumAnalyzerCanvas({
     <canvas
       ref={canvasRef}
       className={`w-full min-w-[200px] ${className}`}
-      style={{ height }}
+      style={{ height, background: 'transparent' }}
     />
   );
 }
