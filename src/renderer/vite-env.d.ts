@@ -3,11 +3,11 @@
 interface Window {
   electronAPI: {
     getAppVersion: () => Promise<string>;
-    getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
+    getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string; progress?: number }>;
     checkForUpdates: () => Promise<void>;
     downloadUpdate: () => Promise<void>;
     installUpdate: () => Promise<void>;
-    onUpdateStatus: (cb: (payload: { status: string; version?: string; error?: string }) => void) => () => void;
+    onUpdateStatus: (cb: (payload: { status: string; version?: string; error?: string; progress?: number }) => void) => () => void;
     getSettings: () => Promise<Record<string, any>>;
     saveSettings: (settings: Record<string, any>) => Promise<void>;
     getSpotifyToken: () => Promise<string>;

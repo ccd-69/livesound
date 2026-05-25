@@ -27,6 +27,7 @@ export default function Settings() {
     status: string;
     version?: string;
     error?: string;
+    progress?: number;
   }>({ status: 'idle' });
 
   useEffect(() => {
@@ -82,6 +83,8 @@ export default function Settings() {
         return 'Checking for updates...';
       case 'available':
         return `Update available: v${updateStatus.version}. Click Download to get it.`;
+      case 'downloading':
+        return `Downloading update... ${(updateStatus.progress || 0).toFixed(0)}%`;
       case 'downloaded':
         return `Update v${updateStatus.version} is ready to install.`;
       case 'error':
@@ -293,41 +296,66 @@ export default function Settings() {
               Current version: <span className="text-text">{appVersion || '1.0.0'}</span>
             </p>
             <p className="text-xs text-muted">{getUpdateStatusText()}</p>
-            <div className="flex gap-2">
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => window.electronAPI.checkForUpdates()}
-                disabled={updateStatus.status === 'checking'}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
-              >
-                {updateStatus.status === 'checking' ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin" /> Checking...
-                  </span>
-                ) : (
-                  'Check for Updates'
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => window.electronAPI.checkForUpdates()}
+                  disabled={updateStatus.status === 'checking' || updateStatus.status === 'downloading'}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  {updateStatus.status === 'checking' ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Checking...
+                    </span>
+                  ) : (
+                    'Check for Updates'
+                  )}
+                </motion.button>
+                {updateStatus.status === 'available' && (
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => window.electronAPI.downloadUpdate()}
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black"
+                  >
+                    Download
+                  </motion.button>
                 )}
-              </motion.button>
-              {updateStatus.status === 'available' && (
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => window.electronAPI.downloadUpdate()}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black"
-                >
-                  Download
-                </motion.button>
-              )}
-              {updateStatus.status === 'downloaded' && (
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => window.electronAPI.installUpdate()}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black"
-                >
-                  Install & Restart
-                </motion.button>
+                {updateStatus.status === 'downloading' && (
+                  <motion.button
+                    disabled
+                    className="rounded-lg bg-accent/50 px-4 py-2 text-sm font-semibold text-black"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Downloading...
+                    </span>
+                  </motion.button>
+                )}
+                {updateStatus.status === 'downloaded' && (
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => window.electronAPI.installUpdate()}
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black"
+                  >
+                    Install & Restart
+                  </motion.button>
+                )}
+              </div>
+              {updateStatus.status === 'downloading' && (
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 flex-1 rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all"
+                      style={{ width: `${updateStatus.progress || 0}%` }}
+                    />
+                  </div>
+                  <span className="min-w-[40px] text-right text-xs text-muted tabular-nums">
+                    {(updateStatus.progress || 0).toFixed(0)}%
+                  </span>
+                </div>
               )}
             </div>
           </div>

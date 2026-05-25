@@ -725,8 +725,8 @@ ipcMain.handle('install-update', () => {
   mainWindow?.removeAllListeners('close');
   updater.quitAndInstall();
 });
-ipcMain.handle('download-update', () => {
-  updater.downloadUpdate();
+ipcMain.handle('download-update', async () => {
+  await updater.downloadUpdate();
 });
 
 // Window controls
