@@ -83,7 +83,10 @@ export default function MiniPlayer() {
     : 0;
 
   return (
-    <div className="flex h-screen w-screen select-none items-center overflow-hidden rounded-2xl bg-black/90 text-white backdrop-blur-md">
+    <div
+      className="flex h-screen w-screen select-none items-center overflow-hidden rounded-2xl bg-[#121212] text-white"
+      style={{ WebkitAppRegion: 'drag' }}
+    >
       {/* Album Art */}
       <div className="relative h-full w-[120px] shrink-0 overflow-hidden">
         {track?.image ? (
@@ -107,6 +110,7 @@ export default function MiniPlayer() {
         <button
           onClick={handleClose}
           className="absolute right-2 top-2 rounded-full p-1 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+          style={{ WebkitAppRegion: 'no-drag' }}
         >
           <X size={14} />
         </button>
@@ -134,6 +138,7 @@ export default function MiniPlayer() {
           <button
             onClick={handlePrevious}
             className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            style={{ WebkitAppRegion: 'no-drag' }}
           >
             <SkipBack size={16} fill="currentColor" />
           </button>
@@ -141,6 +146,7 @@ export default function MiniPlayer() {
           <button
             onClick={handlePlayPause}
             className="rounded-full bg-white/15 p-2 text-white transition-colors hover:bg-white/25"
+            style={{ WebkitAppRegion: 'no-drag' }}
           >
             {track?.isPlaying ? (
               <Pause size={18} fill="currentColor" />
@@ -152,6 +158,7 @@ export default function MiniPlayer() {
           <button
             onClick={handleNext}
             className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            style={{ WebkitAppRegion: 'no-drag' }}
           >
             <SkipForward size={16} fill="currentColor" />
           </button>

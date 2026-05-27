@@ -111,4 +111,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   sendMiniPlayerState: (state: any) => ipcRenderer.invoke('send-mini-player-state', state),
 
+  // Media controls from mini player
+  playPauseMedia: () => ipcRenderer.invoke('media-play-pause-from-mini'),
+  nextMedia: () => ipcRenderer.invoke('media-next-from-mini'),
+  previousMedia: () => ipcRenderer.invoke('media-previous-from-mini'),
+
 });

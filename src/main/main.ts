@@ -997,3 +997,16 @@ ipcMain.handle('mini-player-is-open', () => {
   return miniPlayer.isMiniPlayerOpen();
 });
 
+// Forward mini player media controls to main window
+ipcMain.handle('media-play-pause-from-mini', () => {
+  mainWindow?.webContents.send('media-play-pause');
+});
+
+ipcMain.handle('media-next-from-mini', () => {
+  mainWindow?.webContents.send('media-next');
+});
+
+ipcMain.handle('media-previous-from-mini', () => {
+  mainWindow?.webContents.send('media-previous');
+});
+

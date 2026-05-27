@@ -24,10 +24,8 @@ export function showMiniPlayer(): BrowserWindow {
     alwaysOnTop: true,
     skipTaskbar: false,
     resizable: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: false,
     roundedCorners: true,
+    backgroundColor: '#121212',
     webPreferences: {
       preload: path.join(__dirname, '../preload.js'),
       contextIsolation: true,

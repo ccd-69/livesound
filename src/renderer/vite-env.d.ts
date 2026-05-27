@@ -67,5 +67,10 @@ interface Window {
     onMiniPlayerState: (cb: (state: any) => void) => () => void;
     sendMiniPlayerState: (state: any) => Promise<void>;
 
+    // Media controls (from mini player)
+    playPauseMedia: () => Promise<void>;
+    nextMedia: () => Promise<void>;
+    previousMedia: () => Promise<void>;
+
   };
 }
