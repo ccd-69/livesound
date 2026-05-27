@@ -968,7 +968,7 @@ ipcMain.handle('youtube-show-view', (_event, show: boolean) => {
 });
 
 ipcMain.handle('send-mini-player-state', (_event, state: any) => {
-  miniPlayer.sendToMiniPlayer('mini-player-state', state);
+  miniPlayer.cacheMiniPlayerState(state);
 });
 
 // Discord Rich Presence IPC
@@ -989,8 +989,8 @@ ipcMain.handle('discord-disconnect', () => {
 });
 
 // Mini Player IPC
-ipcMain.handle('mini-player-show', () => {
-  miniPlayer.showMiniPlayer();
+ipcMain.handle('mini-player-show', async () => {
+  await miniPlayer.showMiniPlayer();
 });
 
 ipcMain.handle('mini-player-hide', () => {

@@ -418,7 +418,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   }, [youtubeCurrentTrack, isYouTubePlaying, youtubeDuration]);
 
   // Keep refs to the latest callbacks so media-key subscriptions don't stale-close
-  const callbacksRef = useRef({ play, pause, toggle, next, previous });
+  // Ref to cache latest mini player state for when mini window opens after playback starts
+  const miniPlayerStateRef = useRef<any>(null);
   callbacksRef.current = { play, pause, toggle, next, previous };
 
   useEffect(() => {
@@ -531,14 +532,19 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
 
     // Broadcast to mini player
-    window.electronAPI.sendMiniPlayerState({
+    const miniState = {
       title: getTrackTitle(activeTrack),
       artist: getTrackArtist(activeTrack),
       image: activeTrack?.album?.images?.[0]?.url || activeTrack?.image || activeTrack?.thumbnail,
       isPlaying,
       currentTime: isSpotifyPlaying ? spotify.position : youtubeProgress,
       duration: isSpotifyPlaying ? spotify.duration : youtubeDuration,
-    }).catch(() => {});
+      source: activeTrack?.source || '',
+      uri: activeTrack?.uri || '',
+      videoId: activeTrack?.videoId || activeTrack?.id || '',
+    };
+    miniPlayerStateRef.current = miniState;
+    window.electronAPI.sendMiniPlayerState(miniState).catch(() => {});
   }, [activeTrack, isSpotifyPlaying, isYouTubePlaying, spotify.position, spotify.duration, youtubeProgress, youtubeDuration]);
 
   const isYouTubeActive = !!youtubeCurrentTrack;
