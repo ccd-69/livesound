@@ -5,6 +5,12 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let miniPlayerWindow: BrowserWindow | null = null;
+let devServerUrl: string | null = null;
+
+/** Store the actual Vite dev server URL so the mini player loads from the same origin. */
+export function setDevServerUrl(url: string) {
+  devServerUrl = url.replace(/\/$/, '');
+}
 
 export function isMiniPlayerOpen(): boolean {
   return miniPlayerWindow !== null && !miniPlayerWindow.isDestroyed();
@@ -39,9 +45,8 @@ export function showMiniPlayer(): BrowserWindow {
   miniPlayerWindow.setPosition(screenWidth - 380, screenHeight - 140);
 
   if (process.env.NODE_ENV === 'development') {
-    // In dev, we need to use the same Vite dev server URL but with hash routing
-    // The dev server port can vary, so we'll use the same origin as the main window
-    miniPlayerWindow.loadURL('http://localhost:5173/#/mini-player');
+    const baseUrl = devServerUrl || 'http://localhost:5173';
+    miniPlayerWindow.loadURL(`${baseUrl}/#/mini-player`);
   } else {
     miniPlayerWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'), {
       hash: '/mini-player',

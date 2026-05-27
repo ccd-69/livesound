@@ -172,7 +172,15 @@ async function createWindow() {
   updater.sendCurrentStatus();
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173/');
+    mainWindow.loadURL('http://localhost:5173/').catch(() => {});
+    // Capture the actual URL after load so the mini player uses the same origin
+    mainWindow.webContents.once('did-finish-load', () => {
+      const loadedUrl = mainWindow?.webContents.getURL();
+      if (loadedUrl) {
+        miniPlayer.setDevServerUrl(loadedUrl);
+        console.log(`[Main] Captured dev URL for mini player: ${loadedUrl}`);
+      }
+    });
     mainWindow.webContents.openDevTools();
   } else {
     await mainWindow.loadURL(`http://localhost:${staticServerPort}`);
