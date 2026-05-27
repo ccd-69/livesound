@@ -10,6 +10,7 @@ import {
   Volume2,
   Volume1,
   VolumeX,
+  PictureInPicture2,
 } from 'lucide-react';
 import { usePlayback } from '../hooks/usePlayback';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -115,6 +116,11 @@ export default function PlayerBar() {
           mode={playback.repeatMode}
           onClick={playback.toggleRepeatMode}
         />
+        <ControlButton
+          onClick={() => window.electronAPI.showMiniPlayer().catch(() => {})}
+          icon={<PictureInPicture2 size={18} />}
+          title="Open Mini Player"
+        />
       </div>
 
       {/* Equalizer — hidden on NowPlaying only when spectrum analyzer is enabled there */}
@@ -192,17 +198,20 @@ function ControlButton({
   icon,
   large,
   active,
+  title,
 }: {
   onClick: () => void;
   icon: React.ReactNode;
   large?: boolean;
   active?: boolean;
+  title?: string;
 }) {
   return (
     <motion.button
       whileHover={{ scale: 1.12 }}
       whileTap={{ scale: 0.92 }}
       onClick={onClick}
+      title={title}
       className={`flex items-center justify-center rounded-full text-text transition-colors ${
         large ? 'h-10 w-10' : 'h-8 w-8'
       } ${active ? 'bg-accent/20 text-accent' : 'bg-transparent hover:text-accent'}`}

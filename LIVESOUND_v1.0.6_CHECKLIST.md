@@ -57,13 +57,15 @@
 ---
 
 ### 2. Discord Rich Presence 🎮
-- [ ] Show "Listening to LiveSound" in Discord status
-- [ ] Display current track name, artist, album
-- [ ] Show elapsed time / duration
-- [ ] Add "View on Spotify/YouTube" button (optional)
+- [x] Show "Listening to LiveSound" in Discord status
+- [x] Display current track name, artist, album
+- [x] Show elapsed time / duration
+- [x] Add toggle in Settings to enable/disable
+- [x] Gracefully handle missing client ID or Discord not running
 
-**Files to touch:** `src/main/main.ts` (new module), `src/renderer/hooks/usePlayback.tsx`
-**Estimated effort:** 1-2 hours
+**Files touched:** `src/main/discord/rpc.ts` (new), `src/main/main.ts`, `src/main/preload.ts`, `src/renderer/hooks/usePlayback.tsx`, `src/renderer/pages/Settings.tsx`, `src/renderer/vite-env.d.ts`, `package.json`
+**Status:** ✅ **IMPLEMENTED**
+**Commit:** `f79f46b`
 
 ---
 

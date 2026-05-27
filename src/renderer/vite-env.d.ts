@@ -59,5 +59,13 @@ interface Window {
     discordConnect: () => Promise<void>;
     discordDisconnect: () => Promise<void>;
 
+    // Mini Player
+    showMiniPlayer: () => Promise<void>;
+    hideMiniPlayer: () => Promise<void>;
+    closeMiniPlayer: () => Promise<void>;
+    isMiniPlayerOpen: () => Promise<boolean>;
+    onMiniPlayerState: (cb: (state: any) => void) => () => void;
+    sendMiniPlayerState: (state: any) => Promise<void>;
+
   };
 }

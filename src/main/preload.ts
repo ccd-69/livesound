@@ -99,4 +99,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   discordConnect: () => ipcRenderer.invoke('discord-connect'),
   discordDisconnect: () => ipcRenderer.invoke('discord-disconnect'),
 
+  // Mini Player
+  showMiniPlayer: () => ipcRenderer.invoke('mini-player-show'),
+  hideMiniPlayer: () => ipcRenderer.invoke('mini-player-hide'),
+  closeMiniPlayer: () => ipcRenderer.invoke('mini-player-close'),
+  isMiniPlayerOpen: () => ipcRenderer.invoke('mini-player-is-open'),
+  onMiniPlayerState: (cb: (state: any) => void) => {
+    const listener = (_event: any, state: any) => cb(state);
+    ipcRenderer.on('mini-player-state', listener);
+    return () => ipcRenderer.removeListener('mini-player-state', listener);
+  },
+  sendMiniPlayerState: (state: any) => ipcRenderer.invoke('send-mini-player-state', state),
+
 });

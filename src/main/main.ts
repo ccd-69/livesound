@@ -21,6 +21,7 @@ import * as soundcloudApi from './api/soundcloud.js';
 import * as cache from './db/cache.js';
 import * as updater from './updater.js';
 import * as discordRpc from './discord/rpc.js';
+import * as miniPlayer from './miniPlayer.js';
 
 // Dynamic import for youtube-dl-exec (ESM)
 let youtubedl: any = null;
@@ -958,6 +959,10 @@ ipcMain.handle('youtube-show-view', (_event, show: boolean) => {
   }
 });
 
+ipcMain.handle('send-mini-player-state', (_event, state: any) => {
+  miniPlayer.sendToMiniPlayer('mini-player-state', state);
+});
+
 // Discord Rich Presence IPC
 ipcMain.handle('discord-set-activity', async (_event, activity: any) => {
   await discordRpc.setActivity(activity);
@@ -973,5 +978,22 @@ ipcMain.handle('discord-connect', async () => {
 
 ipcMain.handle('discord-disconnect', () => {
   discordRpc.disconnect();
+});
+
+// Mini Player IPC
+ipcMain.handle('mini-player-show', () => {
+  miniPlayer.showMiniPlayer();
+});
+
+ipcMain.handle('mini-player-hide', () => {
+  miniPlayer.hideMiniPlayer();
+});
+
+ipcMain.handle('mini-player-close', () => {
+  miniPlayer.closeMiniPlayer();
+});
+
+ipcMain.handle('mini-player-is-open', () => {
+  return miniPlayer.isMiniPlayerOpen();
 });
 

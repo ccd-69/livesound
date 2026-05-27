@@ -529,6 +529,16 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       smallImageKey: isPlaying ? 'play' : 'pause',
       smallImageText: isPlaying ? 'Playing' : 'Paused',
     }).catch(() => {});
+
+    // Broadcast to mini player
+    window.electronAPI.sendMiniPlayerState({
+      title: getTrackTitle(activeTrack),
+      artist: getTrackArtist(activeTrack),
+      image: activeTrack?.album?.images?.[0]?.url || activeTrack?.image || activeTrack?.thumbnail,
+      isPlaying,
+      currentTime: isSpotifyPlaying ? spotify.position : youtubeProgress,
+      duration: isSpotifyPlaying ? spotify.duration : youtubeDuration,
+    }).catch(() => {});
   }, [activeTrack, isSpotifyPlaying, isYouTubePlaying, spotify.position, spotify.duration, youtubeProgress, youtubeDuration]);
 
   const isYouTubeActive = !!youtubeCurrentTrack;
