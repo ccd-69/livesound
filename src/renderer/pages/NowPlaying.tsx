@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
@@ -22,6 +22,7 @@ import YouTubePlayer from '../components/YouTubePlayer';
 import DirectStreamPlayer from '../components/DirectStreamPlayer';
 import WebViewPlayer from '../components/WebViewPlayer';
 import YouTubeVideoInfo from '../components/YouTubeVideoInfo';
+import LyricsDisplay from '../components/LyricsDisplay';
 
 function formatTime(ms: number) {
   if (!ms || isNaN(ms)) return '0:00';
@@ -191,6 +192,16 @@ export default function NowPlaying() {
               </motion.p>
             </div>
           )}
+
+          {/* Lyrics Display */}
+          <LyricsDisplay
+            trackName={track?.name || track?.title}
+            artistName={track?.artists?.map((a: any) => a.name).join(', ') || track?.artist}
+            albumName={track?.album?.name}
+            duration={playback.duration}
+            currentTime={playback.progress}
+            isPlaying={playback.isPlaying}
+          />
 
           {/* Progress + Controls + Volume — hidden for YouTube since PlayerBar handles them */}
           {!playback.youtubeCurrentTrack && (

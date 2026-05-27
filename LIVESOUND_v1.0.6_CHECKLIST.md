@@ -70,14 +70,18 @@
 ---
 
 ### 3. Mini Player / Picture-in-Picture 🖼️
-- [ ] Create compact floating window (300x100 or similar)
-- [ ] Always-on-top, frameless, transparent background
-- [ ] Basic controls: play/pause, next, prev, close
-- [ ] Toggle from main window or global shortcut
-- [ ] Sync state with main player
+- [x] Create compact floating window (360x120, frameless, always-on-top, transparent)
+- [x] Always-on-top, frameless, rounded corners
+- [x] Basic controls: play/pause, next, prev, close
+- [x] Toggle from main window (PictureInPicture2 button in PlayerBar)
+- [x] Sync state with main player via IPC broadcast
+- [x] Separate lazy-loaded chunk
 
-**Files to touch:** `src/main/main.ts`, new `src/main/miniPlayer.ts`, `src/renderer/pages/MiniPlayer.tsx`
-**Estimated effort:** 3-4 hours
+**Files touched:** `src/main/miniPlayer.ts` (new), `src/renderer/pages/MiniPlayer.tsx` (new), `src/renderer/App.tsx`, `src/renderer/components/PlayerBar.tsx`, `src/main/main.ts`, `src/main/preload.ts`, `src/renderer/hooks/usePlayback.tsx`
+**Status:** ✅ **IMPLEMENTED**
+**Commit:** `15545df`
+
+---
 
 ---
 
