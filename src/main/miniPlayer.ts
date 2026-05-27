@@ -15,11 +15,11 @@ let cachedState: any = null;
 async function findViteDevServer(): Promise<string | null> {
   const ports = [5173, 5174, 5175, 5176, 5177, 5178, 5179, 5180];
   for (const port of ports) {
-    const url = `http://localhost:${port}/`;
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(500) });
-      if (response.ok || response.status === 404) {
-        // Vite returns 404 for unknown paths but still responds
+      const response = await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(500) });
+      const text = await response.text();
+      // Verify this is actually our Vite dev server by checking for the Vite client script
+      if (text.includes('/@vite/client') || text.includes('__VITE_IS_MODERN__')) {
         return `http://localhost:${port}`;
       }
     } catch {

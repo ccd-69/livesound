@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, net, desktopCapturer } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, desktopCapturer } from 'electron';
 import http from 'http';
 import fs from 'fs';
 import os from 'os';
@@ -72,6 +72,24 @@ const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let ytmView: WebContentsView | null = null;
+
+/** Probe localhost ports to find the active Vite dev server serving our app. */
+async function findViteDevServer(): Promise<string | null> {
+  const ports = [5173, 5174, 5175, 5176, 5177, 5178, 5179, 5180];
+  for (const port of ports) {
+    try {
+      const response = await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(500) });
+      const text = await response.text();
+      // Verify this is actually our Vite dev server by checking for the Vite client script
+      if (text.includes('/@vite/client') || text.includes('__VITE_IS_MODERN__')) {
+        return `http://localhost:${port}`;
+      }
+    } catch {
+      // port not responding or not our app
+    }
+  }
+  return null;
+}
 
 function destroyYtmView() {
   if (ytmView) {
@@ -172,15 +190,10 @@ async function createWindow() {
   updater.sendCurrentStatus();
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173/').catch(() => {});
-    // Capture the actual URL after load so the mini player uses the same origin
-    mainWindow.webContents.once('did-finish-load', () => {
-      const loadedUrl = mainWindow?.webContents.getURL();
-      if (loadedUrl) {
-        miniPlayer.setDevServerUrl(loadedUrl);
-        console.log(`[Main] Captured dev URL for mini player: ${loadedUrl}`);
-      }
-    });
+    const devUrl = (await findViteDevServer()) || 'http://localhost:5173';
+    console.log(`[Main] Loading renderer from: ${devUrl}`);
+    mainWindow.loadURL(`${devUrl}/`).catch(() => {});
+    miniPlayer.setDevServerUrl(devUrl);
     mainWindow.webContents.openDevTools();
   } else {
     await mainWindow.loadURL(`http://localhost:${staticServerPort}`);
