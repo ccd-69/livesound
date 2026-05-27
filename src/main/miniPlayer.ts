@@ -8,27 +8,6 @@ let miniPlayerWindow: BrowserWindow | null = null;
 let devServerUrl: string | null = null;
 let cachedState: any = null;
 
-/**
- * Probe localhost ports to find the active Vite dev server.
- * Returns the first responsive URL or null if none found.
- */
-async function findViteDevServer(): Promise<string | null> {
-  const ports = [5173, 5174, 5175, 5176, 5177, 5178, 5179, 5180];
-  for (const port of ports) {
-    try {
-      const response = await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(500) });
-      const text = await response.text();
-      // Verify this is actually our Vite dev server by checking for the Vite client script
-      if (text.includes('/@vite/client') || text.includes('__VITE_IS_MODERN__')) {
-        return `http://localhost:${port}`;
-      }
-    } catch {
-      // port not responding, try next
-    }
-  }
-  return null;
-}
-
 /** Store the actual Vite dev server URL so the mini player loads from the same origin. */
 export function setDevServerUrl(url: string) {
   devServerUrl = url.replace(/\/$/, '');
@@ -76,12 +55,8 @@ export async function showMiniPlayer(): Promise<BrowserWindow> {
   miniPlayerWindow.setPosition(screenWidth - 380, screenHeight - 140);
 
   if (process.env.NODE_ENV === 'development') {
-    // In dev, probe for the actual Vite server since the port may shift
-    // due to stale processes from previous dev sessions.
-    const baseUrl = devServerUrl || (await findViteDevServer()) || 'http://localhost:5173';
-    const targetUrl = `${baseUrl.replace(/\/$/, '')}/#/mini-player`;
-    console.log('[MiniPlayer] Loading from:', targetUrl);
-    miniPlayerWindow.loadURL(targetUrl);
+    const baseUrl = devServerUrl || 'http://localhost:5173';
+    miniPlayerWindow.loadURL(`${baseUrl.replace(/\/$/, '')}/#/mini-player`);
   } else {
     miniPlayerWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'), {
       hash: '/mini-player',

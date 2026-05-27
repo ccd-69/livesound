@@ -73,24 +73,6 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let ytmView: WebContentsView | null = null;
 
-/** Probe localhost ports to find the active Vite dev server serving our app. */
-async function findViteDevServer(): Promise<string | null> {
-  const ports = [5173, 5174, 5175, 5176, 5177, 5178, 5179, 5180];
-  for (const port of ports) {
-    try {
-      const response = await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(500) });
-      const text = await response.text();
-      // Verify this is actually our Vite dev server by checking for the Vite client script
-      if (text.includes('/@vite/client') || text.includes('__VITE_IS_MODERN__')) {
-        return `http://localhost:${port}`;
-      }
-    } catch {
-      // port not responding or not our app
-    }
-  }
-  return null;
-}
-
 function destroyYtmView() {
   if (ytmView) {
     try {
@@ -190,8 +172,7 @@ async function createWindow() {
   updater.sendCurrentStatus();
 
   if (isDev) {
-    const devUrl = (await findViteDevServer()) || 'http://localhost:5173';
-    console.log(`[Main] Loading renderer from: ${devUrl}`);
+    const devUrl = 'http://localhost:5173';
     mainWindow.loadURL(`${devUrl}/`).catch(() => {});
     miniPlayer.setDevServerUrl(devUrl);
     mainWindow.webContents.openDevTools();

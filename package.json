@@ -6,6 +6,7 @@
   "main": "dist/main/main.js",
   "type": "module",
   "scripts": {
+    "predev": "npx kill-port 5173 2> nul || exit 0",
     "dev": "concurrently \"npm:dev:vite\" \"npm:dev:electron\"",
     "dev:vite": "vite --config vite.renderer.config.ts",
     "dev:electron": "npm run build:main && npm run build:preload && cross-env NODE_ENV=development electron . --remote-debugging-port=9222",
@@ -149,6 +150,7 @@
     "electron": "^42.2.0",
     "electron-builder": "^26.8.1",
     "electron-channel-doctor": "^2.4.0",
+    "kill-port": "^2.0.1",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
