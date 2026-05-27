@@ -93,4 +93,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('media-previous', listener);
   },
 
+  // Discord Rich Presence
+  discordSetActivity: (activity: any) => ipcRenderer.invoke('discord-set-activity', activity),
+  discordClearActivity: () => ipcRenderer.invoke('discord-clear-activity'),
+  discordConnect: () => ipcRenderer.invoke('discord-connect'),
+  discordDisconnect: () => ipcRenderer.invoke('discord-disconnect'),
+
 });

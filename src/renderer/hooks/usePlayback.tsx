@@ -505,6 +505,32 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     });
   }, [activeTrack, isSpotifyPlaying, isYouTubePlaying, play, pause, next, previous, seek, spotify.position, youtubeProgress]);
 
+  // ── Discord Rich Presence ─────────────────────────────────────
+  useEffect(() => {
+    if (!activeTrack) {
+      window.electronAPI.discordClearActivity().catch(() => {});
+      return;
+    }
+
+    const isPlaying = isSpotifyPlaying || isYouTubePlaying;
+    const now = Date.now();
+    const startTime = isPlaying ? now - (isSpotifyPlaying ? spotify.position : youtubeProgress) : undefined;
+    const endTime = isPlaying && (isSpotifyPlaying ? spotify.duration : youtubeDuration) > 0
+      ? startTime! + (isSpotifyPlaying ? spotify.duration : youtubeDuration)
+      : undefined;
+
+    window.electronAPI.discordSetActivity({
+      details: getTrackTitle(activeTrack),
+      state: getTrackArtist(activeTrack),
+      startTimestamp: startTime ? Math.floor(startTime / 1000) : undefined,
+      endTimestamp: endTime ? Math.floor(endTime / 1000) : undefined,
+      largeImageKey: 'livesound_logo',
+      largeImageText: 'LiveSound',
+      smallImageKey: isPlaying ? 'play' : 'pause',
+      smallImageText: isPlaying ? 'Playing' : 'Paused',
+    }).catch(() => {});
+  }, [activeTrack, isSpotifyPlaying, isYouTubePlaying, spotify.position, spotify.duration, youtubeProgress, youtubeDuration]);
+
   const isYouTubeActive = !!youtubeCurrentTrack;
   const value: PlaybackState = {
     isPlaying: isSpotifyPlaying || isYouTubePlaying,

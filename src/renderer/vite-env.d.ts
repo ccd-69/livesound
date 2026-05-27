@@ -53,5 +53,11 @@ interface Window {
     youtubeVideoComments: (videoId: string) => Promise<{ success: boolean; comments?: any[]; error?: string }>;
     youtubePostComment: (videoId: string, text: string) => Promise<{ success: boolean; error?: string }>;
 
+    // Discord Rich Presence
+    discordSetActivity: (activity: any) => Promise<void>;
+    discordClearActivity: () => Promise<void>;
+    discordConnect: () => Promise<void>;
+    discordDisconnect: () => Promise<void>;
+
   };
 }

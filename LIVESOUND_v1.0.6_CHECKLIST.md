@@ -45,13 +45,14 @@
 ## ✅ PHASE 1: Quick Wins (Next)
 
 ### 1. Media Session API Integration 🎵
-- [ ] Show track metadata in OS media controls (Windows volume overlay, macOS Control Center, Linux MPRIS)
-- [ ] Display album art in system UI
-- [ ] Wire up play/pause/next/previous from OS controls
-- [ ] Test on Windows, macOS, Linux
+- [x] Show track metadata in OS media controls (Windows volume overlay, macOS Control Center, Linux MPRIS)
+- [x] Display album art in system UI
+- [x] Wire up play/pause/next/previous/seek from OS controls
+- [ ] Test on Windows, macOS, Linux *(requires playing music with auth)*
 
-**Files to touch:** `src/main/main.ts`, `src/renderer/hooks/usePlayback.tsx`
-**Estimated effort:** 2-3 hours
+**Files touched:** `src/renderer/hooks/usePlayback.tsx`
+**Status:** ✅ **IMPLEMENTED** — Ready for testing once music plays
+**Commit:** `8722dbc`
 
 ---
 

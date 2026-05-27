@@ -15,6 +15,7 @@ import {
   MonitorPlay,
   Radio,
   Globe,
+  Gamepad2,
 } from 'lucide-react';
 
 export default function Settings() {
@@ -24,6 +25,7 @@ export default function Settings() {
   const [youtubeClientSecret, setYouTubeClientSecret] = useState('');
   const [soundcloudClientId, setSoundCloudClientId] = useState('');
   const [soundcloudClientSecret, setSoundCloudClientSecret] = useState('');
+  const [discordClientId, setDiscordClientId] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [updateStatus, setUpdateStatus] = useState<{
     status: string;
@@ -38,6 +40,7 @@ export default function Settings() {
       setSpotifyClientId(s.spotifyClientId || '');
       setYouTubeClientId(s.youtubeClientId || '');
       setSoundCloudClientId(s.soundcloudClientId || '');
+      setDiscordClientId(s.discordClientId || '');
     });
     window.electronAPI.getAppVersion().then(setAppVersion);
     window.electronAPI.getUpdateStatus().then(setUpdateStatus);
@@ -85,6 +88,12 @@ export default function Settings() {
     if (soundcloudClientId.trim() && soundcloudClientSecret.trim()) {
       window.electronAPI.setSoundCloudCredentials(soundcloudClientId.trim(), soundcloudClientSecret.trim());
     }
+  };
+
+  const saveDiscordId = () => {
+    if (!discordClientId.trim()) return;
+    update('discordClientId', discordClientId.trim());
+    window.electronAPI.discordConnect().catch(() => {});
   };
 
   const clearAllCache = async () => {
@@ -287,6 +296,50 @@ export default function Settings() {
           </div>
         </Section>
 
+        {/* Discord Rich Presence */}
+        <Section icon={<Gamepad2 size={18} />} title="Discord Rich Presence">
+          <div className="flex flex-col gap-3">
+            <ToggleRow
+              label="Enable Discord Rich Presence"
+              description="Show what you're listening to on your Discord profile"
+              checked={settings.discordRichPresence ?? false}
+              onChange={(v) => {
+                update('discordRichPresence', v);
+                if (v) {
+                  window.electronAPI.discordConnect().catch(() => {});
+                } else {
+                  window.electronAPI.discordDisconnect();
+                }
+              }}
+            />
+            <label className="text-xs font-medium text-muted">Discord Application Client ID</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={discordClientId}
+                onChange={(e) => setDiscordClientId(e.target.value)}
+                placeholder="Paste your Discord App Client ID"
+                className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+              />
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={saveDiscordId}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-black"
+              >
+                <Save size={14} /> Save
+              </motion.button>
+            </div>
+            <p className="text-xs text-muted">
+              Create an application at{' '}
+              <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                Discord Developer Portal
+              </a>
+              . Copy the Application ID (Client ID) and paste it above. No OAuth redirect needed.
+            </p>
+          </div>
+        </Section>
+
         {/* Playback */}
         <Section icon={<RefreshCw size={18} />} title="Playback">
           <div className="flex items-center gap-3">
@@ -439,7 +492,7 @@ export default function Settings() {
         {/* About */}
         <Section icon={<Info size={18} />} title="About">
           <p className="text-sm text-muted">
-            LiveSound v1.0.4 — Personal unified media player for Spotify and YouTube Music.
+            LiveSound v1.0.6 — Personal unified media player for Spotify and YouTube Music.
           </p>
         </Section>
       </div>

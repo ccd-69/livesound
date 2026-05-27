@@ -20,6 +20,7 @@ import * as youtubeApi from './api/youtube.js';
 import * as soundcloudApi from './api/soundcloud.js';
 import * as cache from './db/cache.js';
 import * as updater from './updater.js';
+import * as discordRpc from './discord/rpc.js';
 
 // Dynamic import for youtube-dl-exec (ESM)
 let youtubedl: any = null;
@@ -451,6 +452,9 @@ app.whenReady().then(async () => {
       }
     }
   })();
+
+  // Connect to Discord RPC if configured
+  discordRpc.connect().catch(() => {});
 
   // Global media key shortcuts
   globalShortcut.register('MediaPlayPause', () => {
@@ -952,5 +956,22 @@ ipcMain.handle('youtube-show-view', (_event, show: boolean) => {
   } else {
     ytmView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
   }
+});
+
+// Discord Rich Presence IPC
+ipcMain.handle('discord-set-activity', async (_event, activity: any) => {
+  await discordRpc.setActivity(activity);
+});
+
+ipcMain.handle('discord-clear-activity', async () => {
+  await discordRpc.clearActivity();
+});
+
+ipcMain.handle('discord-connect', async () => {
+  await discordRpc.connect();
+});
+
+ipcMain.handle('discord-disconnect', () => {
+  discordRpc.disconnect();
 });
 
