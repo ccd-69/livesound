@@ -22,6 +22,8 @@ export default function Settings() {
   const [spotifyClientId, setSpotifyClientId] = useState('');
   const [youtubeClientId, setYouTubeClientId] = useState('');
   const [youtubeClientSecret, setYouTubeClientSecret] = useState('');
+  const [soundcloudClientId, setSoundCloudClientId] = useState('');
+  const [soundcloudClientSecret, setSoundCloudClientSecret] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [updateStatus, setUpdateStatus] = useState<{
     status: string;
@@ -35,6 +37,7 @@ export default function Settings() {
       setSettings(s);
       setSpotifyClientId(s.spotifyClientId || '');
       setYouTubeClientId(s.youtubeClientId || '');
+      setSoundCloudClientId(s.soundcloudClientId || '');
     });
     window.electronAPI.getAppVersion().then(setAppVersion);
     window.electronAPI.getUpdateStatus().then(setUpdateStatus);
@@ -69,6 +72,18 @@ export default function Settings() {
     window.electronAPI.saveSettings(next);
     if (youtubeClientId.trim() && youtubeClientSecret.trim()) {
       window.electronAPI.setYouTubeCredentials(youtubeClientId.trim(), youtubeClientSecret.trim());
+    }
+  };
+
+  const saveSoundCloudCreds = () => {
+    const next: any = { ...settings, soundcloudClientId: soundcloudClientId.trim() };
+    if (soundcloudClientSecret.trim()) {
+      next.soundcloudClientSecret = soundcloudClientSecret.trim();
+    }
+    setSettings(next);
+    window.electronAPI.saveSettings(next);
+    if (soundcloudClientId.trim() && soundcloudClientSecret.trim()) {
+      window.electronAPI.setSoundCloudCredentials(soundcloudClientId.trim(), soundcloudClientSecret.trim());
     }
   };
 
@@ -207,6 +222,66 @@ export default function Settings() {
                 className="mt-1 w-full rounded-lg border border-border py-2 text-sm text-text transition-colors hover:bg-hover"
               >
                 Disconnect YouTube
+              </motion.button>
+            )}
+          </div>
+        </Section>
+
+        {/* SoundCloud */}
+        <Section icon={<Radio size={18} />} title="SoundCloud Configuration">
+          <div className="flex flex-col gap-3">
+            <label className="text-xs font-medium text-muted">Client ID</label>
+            <input
+              type="password"
+              value={soundcloudClientId}
+              onChange={(e) => setSoundCloudClientId(e.target.value)}
+              placeholder="Paste your SoundCloud Client ID"
+              className="rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            />
+            <label className="text-xs font-medium text-muted">Client Secret</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={soundcloudClientSecret}
+                onChange={(e) => setSoundCloudClientSecret(e.target.value)}
+                placeholder="Paste your SoundCloud Client Secret"
+                className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+              />
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={saveSoundCloudCreds}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-black"
+              >
+                <Save size={14} /> Save
+              </motion.button>
+            </div>
+            <p className="text-xs text-muted">
+              Create an app at{' '}
+              <a href="https://soundcloud.com/you/apps" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                SoundCloud Developer Portal
+              </a>
+              . Add https://localhost:8890/callback as a Redirect URI.
+            </p>
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-sm">Status</span>
+              <span className={`text-sm font-medium ${settings.soundcloudConnected ? 'text-accent' : 'text-muted'}`}>
+                {settings.soundcloudConnected ? 'Connected' : 'Not connected'}
+              </span>
+            </div>
+            {settings.soundcloudConnected && (
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() =>
+                  window.electronAPI.soundCloudLogout().then(() =>
+                    setSettings((s: any) => ({ ...s, soundcloudConnected: false }))
+                  )
+                }
+                className="mt-1 w-full rounded-lg border border-border py-2 text-sm text-text transition-colors hover:bg-hover"
+              >
+                Disconnect SoundCloud
               </motion.button>
             )}
           </div>

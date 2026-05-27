@@ -18,6 +18,11 @@ interface Window {
     startYouTubeAuth: () => Promise<void>;
     youTubeLogout: () => Promise<void>;
     setYouTubeCredentials: (id: string, secret: string) => Promise<void>;
+    startSoundCloudAuth: () => Promise<void>;
+    soundCloudLogout: () => Promise<void>;
+    setSoundCloudCredentials: (id: string, secret: string) => Promise<void>;
+    syncSoundCloudLibrary: () => Promise<{ playlists: any[]; tracks: any[] }>;
+    soundCloudGetStreamUrl: (trackId: string) => Promise<{ success: boolean; url?: string; error?: string }>;
     syncSpotifyLibrary: () => Promise<{ playlists: any[]; albums: any[] }>;
     syncYouTubeLibrary: () => Promise<{ playlists: any[] }>;
     getPlaylistTracks: (playlistId: string, source: string) => Promise<any[]>;

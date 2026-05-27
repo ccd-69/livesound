@@ -1,13 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Play, Pause, Loader2, AlertCircle } from 'lucide-react';
 import { usePlayback } from '../hooks/usePlayback';
-import { connectAudioElement } from '../lib/audioAnalyser';
+import { connectAudioElement, stopAudioCapture } from '../lib/audioAnalyser';
 
 interface DirectStreamPlayerProps {
   videoUrl: string;
   className?: string;
 }
+
+const STREAM_URL_MAX_AGE_MS = 5 * 60 * 60 * 1000; // 5 hours (conservative, yt-dlp URLs expire ~6h)
 
 export default function DirectStreamPlayer({
   videoUrl,
@@ -21,36 +23,58 @@ export default function DirectStreamPlayer({
   const [playing, setPlaying] = useState(false);
   const playback = usePlayback();
 
-  useEffect(() => {
-    let cancelled = false;
+  // Track when the stream URL was fetched so we can refresh before expiration
+  const streamUrlFetchedAtRef = useRef<number>(0);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRefreshingRef = useRef(false);
 
-    async function loadStream() {
-      setLoading(true);
-      setError('');
-      setStreamUrl('');
+  const loadStream = useCallback(async () => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
 
-      try {
-        const result = await window.electronAPI.youtubeGetStreamUrl(videoUrl);
-        if (cancelled) return;
+    setLoading(true);
+    setError('');
 
-        if (result.success && result.url) {
-          setStreamUrl(result.url);
-          setTitle(result.title || '');
-        } else {
-          setError(result.error || 'Failed to extract stream URL');
+    try {
+      const result = await window.electronAPI.youtubeGetStreamUrl(videoUrl);
+
+      if (result.success && result.url) {
+        setStreamUrl(result.url);
+        streamUrlFetchedAtRef.current = Date.now();
+        setTitle(result.title || '');
+        setError('');
+
+        // Schedule a refresh before the URL expires
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current);
         }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err.message || 'Unknown error');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        refreshTimeoutRef.current = setTimeout(() => {
+          console.log('[DirectStreamPlayer] Refreshing stream URL before expiration...');
+          loadStream();
+        }, STREAM_URL_MAX_AGE_MS);
+      } else {
+        setError(result.error || 'Failed to extract stream URL');
+        setStreamUrl('');
       }
+    } catch (err: any) {
+      setError(err.message || 'Unknown error');
+      setStreamUrl('');
+    } finally {
+      setLoading(false);
+      isRefreshingRef.current = false;
     }
-
-    loadStream();
-    return () => { cancelled = true; };
   }, [videoUrl]);
+
+  useEffect(() => {
+    loadStream();
+
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+      stopAudioCapture();
+    };
+  }, [videoUrl, loadStream]);
 
   // Register controller so global play/pause controls work for direct-stream mode
   useEffect(() => {
@@ -100,7 +124,19 @@ export default function DirectStreamPlayer({
     if (audioRef.current && streamUrl) {
       connectAudioElement(audioRef.current);
     }
+    return () => {
+      stopAudioCapture();
+    };
   }, [streamUrl]);
+
+  // Handle audio errors — likely expired URL
+  const handleAudioError = useCallback(() => {
+    console.log('[DirectStreamPlayer] Audio error, possibly expired URL. Refreshing...');
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+    loadStream();
+  }, [loadStream]);
 
   if (loading) {
     return (
@@ -133,6 +169,7 @@ export default function DirectStreamPlayer({
         className="hidden"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
+        onError={handleAudioError}
         onEnded={() => {
           setPlaying(false);
           if (playback.repeatMode === 'loop-single') {

@@ -17,6 +17,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   youTubeLogout: () => ipcRenderer.invoke('youtube-logout'),
   setYouTubeCredentials: (id: string, secret: string) => ipcRenderer.invoke('set-youtube-credentials', id, secret),
 
+  // SoundCloud
+  startSoundCloudAuth: () => ipcRenderer.invoke('start-soundcloud-auth'),
+  soundCloudLogout: () => ipcRenderer.invoke('soundcloud-logout'),
+  setSoundCloudCredentials: (id: string, secret: string) => ipcRenderer.invoke('set-soundcloud-credentials', id, secret),
+  syncSoundCloudLibrary: () => ipcRenderer.invoke('sync-soundcloud-library'),
+  soundCloudGetStreamUrl: (trackId: string) => ipcRenderer.invoke('soundcloud-get-stream-url', trackId),
+
   // Library
   syncSpotifyLibrary: () => ipcRenderer.invoke('sync-spotify-library'),
   syncYouTubeLibrary: () => ipcRenderer.invoke('sync-youtube-library'),

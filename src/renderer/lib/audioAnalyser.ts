@@ -22,6 +22,40 @@ function ensureAudioGraph(sr: number) {
 }
 
 /**
+ * Reset the audio graph completely.
+ * Call this when switching between different audio sources to prevent
+ * memory leaks and DOMException from reusing MediaElementAudioSourceNodes.
+ */
+function resetAudioGraph() {
+  if (mediaElementSource) {
+    try { mediaElementSource.disconnect(); } catch { /* ignore */ }
+    mediaElementSource = null;
+    connectedAudioEl = null;
+  }
+  if (sourceNode) {
+    try { sourceNode.disconnect(); } catch { /* ignore */ }
+    sourceNode = null;
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
+  if (analyser) {
+    try { analyser.disconnect(); } catch { /* ignore */ }
+    analyser = null;
+  }
+  if (silenceNode) {
+    try { silenceNode.disconnect(); } catch { /* ignore */ }
+    silenceNode = null;
+  }
+  if (audioCtx) {
+    audioCtx.close().catch(() => {});
+    audioCtx = null;
+  }
+  captureStarted = false;
+}
+
+/**
  * Connect an HTMLAudioElement directly to the analyser.
  * This is the best approach for direct-stream mode — no screen share dialog,
  * clean audio data, and instant connection.
@@ -33,16 +67,11 @@ export function connectAudioElement(audioEl: HTMLAudioElement): boolean {
   }
 
   try {
-    // If a different source is connected (display media or another audio element),
-    // disconnect it first so we can route the new element through the analyser.
-    if (sourceNode) {
-      try { sourceNode.disconnect(); } catch { /* ignore */ }
-      sourceNode = null;
-    }
-    if (mediaElementSource && connectedAudioEl && connectedAudioEl !== audioEl) {
-      try { mediaElementSource.disconnect(); } catch { /* ignore */ }
-      mediaElementSource = null;
-      connectedAudioEl = null;
+    // If switching to a different element, fully reset the audio graph.
+    // createMediaElementSource() can only be called once per HTMLMediaElement,
+    // and trying to create another source for the same element throws DOMException.
+    if (connectedAudioEl && connectedAudioEl !== audioEl) {
+      resetAudioGraph();
     }
 
     currentSampleRate = 48000;
@@ -77,12 +106,10 @@ export async function startAudioCapture(): Promise<boolean> {
   if (captureStarted && mediaStream) return true;
 
   try {
-    // If an audio element was previously connected, disconnect it so we can
-    // route display media audio through the analyser instead.
-    if (mediaElementSource) {
-      try { mediaElementSource.disconnect(); } catch { /* ignore */ }
-      mediaElementSource = null;
-      connectedAudioEl = null;
+    // If an audio element was previously connected, fully reset the graph
+    // so we can route display media audio through the analyser instead.
+    if (mediaElementSource || connectedAudioEl) {
+      resetAudioGraph();
     }
 
     mediaStream = await navigator.mediaDevices.getDisplayMedia({
@@ -125,31 +152,10 @@ export function getSampleRate(): number {
   return currentSampleRate;
 }
 
+/**
+ * Completely stop and clean up all audio capture resources.
+ * Call this when switching tracks, changing modes, or unmounting components.
+ */
 export function stopAudioCapture() {
-  if (mediaElementSource) {
-    try { mediaElementSource.disconnect(); } catch { /* ignore */ }
-    mediaElementSource = null;
-    connectedAudioEl = null;
-  }
-  if (sourceNode) {
-    try { sourceNode.disconnect(); } catch { /* ignore */ }
-    sourceNode = null;
-  }
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-  }
-  if (analyser) {
-    try { analyser.disconnect(); } catch { /* ignore */ }
-    analyser = null;
-  }
-  if (silenceNode) {
-    try { silenceNode.disconnect(); } catch { /* ignore */ }
-    silenceNode = null;
-  }
-  if (audioCtx) {
-    audioCtx.close().catch(() => {});
-    audioCtx = null;
-  }
-  captureStarted = false;
+  resetAudioGraph();
 }

@@ -14,8 +14,10 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { loadSettings, saveSettings } from './store/settings.js';
 import * as spotify from './auth/spotify.js';
 import * as youtube from './auth/youtube.js';
+import * as soundcloud from './auth/soundcloud.js';
 import * as spotifyApi from './api/spotify.js';
 import * as youtubeApi from './api/youtube.js';
+import * as soundcloudApi from './api/soundcloud.js';
 import * as cache from './db/cache.js';
 import * as updater from './updater.js';
 
@@ -391,6 +393,9 @@ app.whenReady().then(async () => {
   if (startupSettings.youtubeClientId && startupSettings.youtubeClientSecret) {
     youtube.setClientCredentials(startupSettings.youtubeClientId, startupSettings.youtubeClientSecret);
   }
+  if (startupSettings.soundcloudClientId && startupSettings.soundcloudClientSecret) {
+    soundcloud.setClientCredentials(startupSettings.soundcloudClientId, startupSettings.soundcloudClientSecret);
+  }
 
   // Start a local HTTP server to serve renderer files in production.
   // A real http://localhost origin gives the YouTube iframe a valid Referer
@@ -528,11 +533,12 @@ ipcMain.handle('get-settings', () => {
   const settings = loadSettings();
   // Override stale booleans if token files are actually missing
   // Never send secrets to the renderer
-  const { youtubeClientSecret: _, ...safeSettings } = settings;
+  const { youtubeClientSecret: _y, soundcloudClientSecret: _s, ...safeSettings } = settings;
   return {
     ...safeSettings,
     spotifyConnected: settings.spotifyConnected && spotify.hasTokens(),
     youtubeConnected: settings.youtubeConnected && youtube.hasTokens(),
+    soundcloudConnected: settings.soundcloudConnected && soundcloud.hasTokens(),
   };
 });
 ipcMain.handle('save-settings', (_event, incoming) => {
@@ -541,6 +547,9 @@ ipcMain.handle('save-settings', (_event, incoming) => {
   // Prevent empty strings from wiping out stored credentials
   if (incoming.youtubeClientSecret === '') {
     merged.youtubeClientSecret = existing.youtubeClientSecret;
+  }
+  if (incoming.soundcloudClientSecret === '') {
+    merged.soundcloudClientSecret = existing.soundcloudClientSecret;
   }
   if (incoming.spotifyClientId === '') {
     merged.spotifyClientId = existing.spotifyClientId;
@@ -608,6 +617,24 @@ ipcMain.handle('set-youtube-credentials', (_event, id: string, secret: string) =
   youtube.setClientCredentials(id, secret);
 });
 
+// SoundCloud IPC
+ipcMain.handle('start-soundcloud-auth', async () => {
+  await soundcloud.startAuth();
+  const settings = loadSettings();
+  saveSettings({ ...settings, soundcloudConnected: true });
+});
+
+ipcMain.handle('soundcloud-logout', async () => {
+  await soundcloud.logout();
+  cache.removePlaylistsBySource('soundcloud');
+  const settings = loadSettings();
+  saveSettings({ ...settings, soundcloudConnected: false });
+});
+
+ipcMain.handle('set-soundcloud-credentials', (_event, id: string, secret: string) => {
+  soundcloud.setClientCredentials(id, secret);
+});
+
 // Library sync IPC
 ipcMain.handle('sync-spotify-library', async () => {
   const [playlists, albums] = await Promise.all([
@@ -625,17 +652,31 @@ ipcMain.handle('sync-youtube-library', async () => {
   return { playlists };
 });
 
-ipcMain.handle('get-playlist-tracks', async (_event, playlistId: string, source: string) => {
+ipcMain.handle('sync-soundcloud-library', async () => {
+  const [playlists, tracks] = await Promise.all([
+    soundcloudApi.getMyPlaylists(),
+    soundcloudApi.getLikedTracks(),
+  ]);
+  cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'soundcloud' })), 'soundcloud');
+  cache.saveTracks(tracks.map((t) => ({ ...t, source: 'soundcloud' })), 'soundcloud');
+  return { playlists, tracks };
+});
+
+ipcMain.handle('get-playlist-tracks', async (_event, playlistId: string, source?: string) => {
   const cached = cache.loadTracks().filter((t: any) => t.playlistId === playlistId);
   if (cached.length > 0) return cached;
 
   let tracks: any[] = [];
-  if (source === 'spotify') {
+  const src = source || 'spotify';
+
+  if (src === 'spotify') {
     tracks = await spotifyApi.getPlaylistTracks(playlistId);
-  } else if (source === 'youtube') {
+  } else if (src === 'youtube') {
     tracks = await youtubeApi.getPlaylistTracks(playlistId);
+  } else if (src === 'soundcloud') {
+    tracks = await soundcloudApi.getPlaylistTracks(playlistId);
   }
-  cache.saveTracks(tracks.map((t) => ({ ...t, playlistId })));
+  cache.saveTracks(tracks, playlistId);
   return tracks;
 });
 
@@ -671,6 +712,16 @@ ipcMain.handle('search-all', async (_event, query: string, musicOnly = false) =>
       const youtubeResults = await youtubeApi.searchYouTube(query, musicOnly);
       results.tracks.push(...youtubeResults.tracks);
       results.playlists.push(...youtubeResults.playlists);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (soundcloud.isAuthenticated()) {
+    try {
+      const scResults = await soundcloudApi.searchSoundCloud(query);
+      results.tracks.push(...scResults.tracks);
+      results.playlists.push(...scResults.playlists);
     } catch {
       // ignore
     }
@@ -822,6 +873,14 @@ ipcMain.handle('youtube-post-comment', async (_event, videoId: string, text: str
   }
 });
 
+ipcMain.handle('soundcloud-get-stream-url', async (_event, trackId: string) => {
+  try {
+    return await soundcloudApi.getStreamUrl(trackId);
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('youtube-create-view', (_event, videoId: string) => {
   if (!mainWindow) return { success: false, error: 'No window' };
 
@@ -843,7 +902,7 @@ ipcMain.handle('youtube-create-view', (_event, videoId: string) => {
   mainWindow.contentView.addChildView(ytmView);
 
   // Position over the content area (right of sidebar, below title bar, above player bar)
-  const bounds = mainWindow.getBounds();
+  const bounds = mainWindow.getContentBounds();
   ytmView.setBounds({
     x: 240,
     y: 32,
@@ -882,7 +941,7 @@ ipcMain.handle('youtube-pause-view', () => {
 
 ipcMain.handle('youtube-show-view', (_event, show: boolean) => {
   if (!mainWindow || !ytmView) return;
-  const bounds = mainWindow.getBounds();
+  const bounds = mainWindow.getContentBounds();
   if (show) {
     ytmView.setBounds({
       x: 240,

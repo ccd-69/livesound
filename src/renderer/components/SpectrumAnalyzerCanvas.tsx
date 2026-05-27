@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
-import { getAnalyser, getSampleRate, startAudioCapture } from '../lib/audioAnalyser';
+import { getAnalyser, getSampleRate, startAudioCapture, stopAudioCapture } from '../lib/audioAnalyser';
 
 interface SpectrumAnalyzerCanvasProps {
   barCount?: number;
@@ -147,6 +147,10 @@ export default function SpectrumAnalyzerCanvas({
         console.error('[SpectrumAnalyzerCanvas] startAudioCapture failed:', e);
       });
     }
+    return () => {
+      // Clean up display media capture when component unmounts
+      stopAudioCapture();
+    };
   }, []);
 
   useEffect(() => {

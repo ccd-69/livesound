@@ -79,10 +79,16 @@ export function appendPlaylist(playlist: any) {
   writeJson('playlists', Array.from(map.values()));
 }
 
-export function saveTracks(tracks: any[]) {
+export function saveTracks(tracks: any[], playlistId?: string) {
   const existing = readJson<any[]>('tracks');
   const map = new Map(existing.map((t) => [t.id, t]));
-  for (const t of tracks) map.set(t.id, t);
+  for (const t of tracks) {
+    const merged = { ...t };
+    if (playlistId) {
+      merged.playlistId = playlistId;
+    }
+    map.set(t.id, merged);
+  }
   writeJson('tracks', Array.from(map.values()));
 }
 
