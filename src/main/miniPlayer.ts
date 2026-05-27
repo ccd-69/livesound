@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, screen } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -36,17 +36,28 @@ export function showMiniPlayer(): BrowserWindow {
   });
 
   // Position in bottom-right corner
-  const primaryDisplay = require('electron').screen.getPrimaryDisplay();
+  const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
   miniPlayerWindow.setPosition(screenWidth - 380, screenHeight - 140);
 
   if (process.env.NODE_ENV === 'development') {
-    miniPlayerWindow.loadURL('http://localhost:5173/mini-player');
+    // In dev, we need to use the same Vite dev server URL but with hash routing
+    // The dev server port can vary, so we'll use the same origin as the main window
+    miniPlayerWindow.loadURL('http://localhost:5173/#/mini-player');
   } else {
     miniPlayerWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'), {
       hash: '/mini-player',
     });
   }
+
+  // Debug: log any load errors
+  miniPlayerWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error('[MiniPlayer] Failed to load:', errorCode, errorDescription);
+  });
+
+  miniPlayerWindow.webContents.on('did-finish-load', () => {
+    console.log('[MiniPlayer] Loaded successfully');
+  });
 
   miniPlayerWindow.on('closed', () => {
     miniPlayerWindow = null;

@@ -23,6 +23,7 @@ export default function LyricsDisplay({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeLine, setActiveLine] = useState(-1);
+  const [showLyrics, setShowLyrics] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -102,28 +103,39 @@ export default function LyricsDisplay({
 
   return (
     <div className="w-full max-w-lg">
-      <div
-        ref={containerRef}
-        className="max-h-[300px] overflow-y-auto px-4 py-4 scrollbar-thin"
+      {/* Toggle button */}
+      <button
+        onClick={() => setShowLyrics(!showLyrics)}
+        className="mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-accent transition-colors hover:bg-accent/10"
       >
-        <div className="flex flex-col gap-3">
-          {lyrics.lines.map((line, i) => (
-            <div
-              key={`${line.time}-${i}`}
-              ref={(el) => { lineRefs.current[i] = el; }}
-              className={`text-center transition-all duration-500 ${
-                i === activeLine
-                  ? 'scale-105 text-lg font-semibold text-text'
-                  : i < activeLine
-                  ? 'text-sm text-white/30'
-                  : 'text-sm text-white/50'
-              }`}
-            >
-              {line.text}
-            </div>
-          ))}
+        <Mic2 size={16} />
+        {showLyrics ? 'Hide Lyrics' : 'Show Lyrics'}
+      </button>
+
+      {showLyrics && (
+        <div
+          ref={containerRef}
+          className="max-h-[300px] overflow-y-auto rounded-xl bg-white/5 px-4 py-4 scrollbar-thin"
+        >
+          <div className="flex flex-col gap-3">
+            {lyrics.lines.map((line, i) => (
+              <div
+                key={`${line.time}-${i}`}
+                ref={(el) => { lineRefs.current[i] = el; }}
+                className={`text-center transition-all duration-500 ${
+                  i === activeLine
+                    ? 'scale-105 text-lg font-semibold text-text'
+                    : i < activeLine
+                    ? 'text-sm text-white/30'
+                    : 'text-sm text-white/50'
+                }`}
+              >
+                {line.text}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
