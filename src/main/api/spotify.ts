@@ -106,3 +106,25 @@ export async function searchSpotify(q: string): Promise<{ tracks: any[]; albums:
     return { tracks, albums, playlists };
   }, 3, 1000);
 }
+
+export async function getRecommendations(seedTrackId: string, limit = 10): Promise<any[]> {
+  return withRateLimit('spotify:recommendations', async () => {
+    const token = await spotifyAuth.getValidAccessToken();
+    const res = await fetch(
+      `https://api.spotify.com/v1/recommendations?seed_tracks=${seedTrackId}&limit=${limit}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) throw new Error(`Spotify recommendations fetch failed: ${res.status}`);
+    const data = await res.json();
+    return (data.tracks || []).map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      artist: t.artists?.map((x: any) => x.name).join(', ') || 'Unknown',
+      album: t.album?.name || '',
+      durationMs: t.duration_ms,
+      image: t.album?.images?.[0]?.url || '',
+      source: 'spotify',
+      uri: t.uri,
+    }));
+  }, 3, 1000);
+}

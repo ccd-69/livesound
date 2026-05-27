@@ -454,6 +454,18 @@ app.whenReady().then(async () => {
         // ignore
       }
     }
+    if (soundcloud.isAuthenticated()) {
+      try {
+        const [playlists, tracks] = await Promise.all([
+          soundcloudApi.getMyPlaylists(),
+          soundcloudApi.getLikedTracks(),
+        ]);
+        cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'soundcloud' })), 'soundcloud');
+        cache.saveTracks(tracks.map((t) => ({ ...t, source: 'soundcloud' })), 'soundcloud');
+      } catch {
+        // ignore
+      }
+    }
   })();
 
   // Connect to Discord RPC if configured
@@ -495,6 +507,18 @@ app.whenReady().then(async () => {
           ]);
           cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'spotify' })), 'spotify');
           cache.saveAlbums(albums.map((a) => ({ ...a, source: 'spotify' })), 'spotify');
+        } catch {
+          // ignore
+        }
+      }
+      if (soundcloud.isAuthenticated()) {
+        try {
+          const [playlists, tracks] = await Promise.all([
+            soundcloudApi.getMyPlaylists(),
+            soundcloudApi.getLikedTracks(),
+          ]);
+          cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'soundcloud' })), 'soundcloud');
+          cache.saveTracks(tracks.map((t) => ({ ...t, source: 'soundcloud' })), 'soundcloud');
         } catch {
           // ignore
         }
@@ -1010,5 +1034,31 @@ ipcMain.handle('media-next-from-mini', () => {
 
 ipcMain.handle('media-previous-from-mini', () => {
   mainWindow?.webContents.send('media-previous');
+});
+
+// Listening History IPC
+ipcMain.handle('append-history-event', (_event, event: any) => {
+  cache.appendHistoryEvent(event);
+});
+
+ipcMain.handle('finalize-history-event', (_event, trackId: string, endedAt: number) => {
+  cache.finalizeHistoryEvent(trackId, endedAt);
+});
+
+ipcMain.handle('load-history', () => {
+  return cache.loadHistory();
+});
+
+ipcMain.handle('clear-history', () => {
+  cache.clearHistory();
+});
+
+// Related Tracks / Autoplay IPC
+ipcMain.handle('youtube-get-related', async (_event, videoId: string, maxResults?: number) => {
+  return youtubeApi.getRelatedVideos(videoId, maxResults);
+});
+
+ipcMain.handle('spotify-get-recommendations', async (_event, seedTrackId: string, limit?: number) => {
+  return spotifyApi.getRecommendations(seedTrackId, limit);
 });
 

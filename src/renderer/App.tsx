@@ -8,6 +8,7 @@ import Search from './pages/Search';
 const Settings = React.lazy(() => import('./pages/Settings'));
 const NowPlaying = React.lazy(() => import('./pages/NowPlaying'));
 const MiniPlayer = React.lazy(() => import('./pages/MiniPlayer'));
+const History = React.lazy(() => import('./pages/History'));
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
                 <Route path="/" element={<Library />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/history" element={<History />} />
                 <Route path="/now-playing" element={<NowPlaying />} />
               </Route>
               <Route path="/mini-player" element={<MiniPlayer />} />

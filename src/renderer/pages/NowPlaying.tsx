@@ -14,10 +14,13 @@ import {
   ChevronDown,
   Music,
   MonitorPlay,
+  Activity,
+  CircleDot,
+  Waves,
 } from 'lucide-react';
 import { getYouTubeVideoId, convertMusicUrlToYouTube } from '../lib/utils';
 import { usePlayback } from '../hooks/usePlayback';
-import SpectrumAnalyzerCanvas from '../components/SpectrumAnalyzerCanvas';
+import VisualizerCanvas, { VisualizerMode } from '../components/VisualizerCanvas';
 import YouTubePlayer from '../components/YouTubePlayer';
 import DirectStreamPlayer from '../components/DirectStreamPlayer';
 import WebViewPlayer from '../components/WebViewPlayer';
@@ -36,6 +39,7 @@ export default function NowPlaying() {
   const playback = usePlayback();
   const navigate = useNavigate();
   const [showSpectrum, setShowSpectrum] = useState(false);
+  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>('spectrum');
   const [bgGradient, setBgGradient] = useState('');
 
   const track = playback.currentTrack;
@@ -45,6 +49,9 @@ export default function NowPlaying() {
     function refresh() {
       window.electronAPI.getSettings().then((s: any) => {
         setShowSpectrum(s.showSpectrumAnalyzer ?? false);
+        const validModes: VisualizerMode[] = ['spectrum', 'circular', 'waveform'];
+        const mode = validModes.includes(s.visualizerMode) ? s.visualizerMode : 'spectrum';
+        setVisualizerMode(mode);
       });
     }
     refresh();
@@ -157,10 +164,34 @@ export default function NowPlaying() {
             </motion.div>
           )}
 
-          {/* Spectrum Analyzer — right below media, before any tall info sections */}
+          {/* Visualizer — right below media, before any tall info sections */}
           {showSpectrum && (
-            <div className="w-full px-2 shrink-0 min-h-[120px]">
-              <SpectrumAnalyzerCanvas barCount={64} height={120} />
+            <div className="w-full px-2 shrink-0 min-h-[140px] flex flex-col gap-2">
+              <div className="flex items-center justify-center gap-2">
+                {[
+                  { mode: 'spectrum' as VisualizerMode, icon: <Activity size={14} />, label: 'Bars' },
+                  { mode: 'circular' as VisualizerMode, icon: <CircleDot size={14} />, label: 'Circle' },
+                  { mode: 'waveform' as VisualizerMode, icon: <Waves size={14} />, label: 'Wave' },
+                ].map((m) => (
+                  <button
+                    key={m.mode}
+                    onClick={() => {
+                      setVisualizerMode(m.mode);
+                      window.electronAPI.saveSettings({ visualizerMode: m.mode });
+                    }}
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      visualizerMode === m.mode
+                        ? 'bg-accent text-black'
+                        : 'bg-hover text-muted hover:text-text'
+                    }`}
+                    title={m.label}
+                  >
+                    {m.icon}
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <VisualizerCanvas mode={visualizerMode} barCount={64} height={120} />
             </div>
           )}
 
@@ -169,7 +200,7 @@ export default function NowPlaying() {
             <YouTubeVideoInfo videoId={playback.youtubeCurrentTrack.id} />
           )}
 
-          {/* Track Info — Spotify only */}
+          {/* Track Info — shown for Spotify and SoundCloud */}
           {!playback.youtubeCurrentTrack && (
             <div className="flex flex-col items-center gap-1 text-center">
               <motion.h1
@@ -182,13 +213,13 @@ export default function NowPlaying() {
                 {track?.name || 'No track selected'}
               </motion.h1>
               <motion.p
-                key={track?.artists?.map((a: any) => a.name).join(', ') || 'no-track-artist'}
+                key={track?.artists?.map((a: any) => a.name).join(', ') || track?.artist || 'no-track-artist'}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.05 }}
                 className="text-base text-muted"
               >
-                {track?.artists?.map((a: any) => a.name).join(', ')}
+                {track?.artists?.map((a: any) => a.name).join(', ') || track?.artist}
               </motion.p>
             </div>
           )}
@@ -289,7 +320,7 @@ export default function NowPlaying() {
         </div>
 
         {/* Playlist Sidebar */}
-        {playback.youtubeCurrentTrack && playback.youtubeQueue.length > 0 && (
+        {(playback.youtubeCurrentTrack || playback.soundcloudCurrentTrack) && playback.youtubeQueue.length > 0 && (
           <div className="w-64 h-full overflow-y-auto border-l border-border/50 px-3 py-4 shrink-0">
             <p className="text-xs font-semibold text-muted uppercase mb-3">Up Next</p>
             <div className="flex flex-col gap-1">

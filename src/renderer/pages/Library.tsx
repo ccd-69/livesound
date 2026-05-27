@@ -6,6 +6,7 @@ import AddToPlaylist from '../components/AddToPlaylist';
 import {
   Music,
   Tv,
+  Cloud,
   ArrowLeft,
   Disc3,
   ListMusic,
@@ -71,6 +72,18 @@ export default function Library() {
     }
   };
 
+  const connectSoundCloud = async () => {
+    setConnecting(true);
+    try {
+      await window.electronAPI.startSoundCloudAuth();
+      await syncSoundCloud();
+    } catch (err: any) {
+      alert(err.message || 'Failed to connect SoundCloud');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
   const syncSpotify = async () => {
     setSyncing(true);
     try {
@@ -115,6 +128,31 @@ export default function Library() {
     }
   };
 
+  const syncSoundCloud = async () => {
+    setSyncing(true);
+    try {
+      const data = await window.electronAPI.syncSoundCloudLibrary();
+      setPlaylists((prev) => {
+        const kept = prev.filter((p) => p.source !== 'soundcloud');
+        const map = new Map(kept.map((p) => [p.id, p]));
+        data.playlists.forEach((p) => map.set(p.id, p));
+        return Array.from(map.values());
+      });
+      setTracks((prev) => {
+        const kept = prev.filter((t) => t.source !== 'soundcloud');
+        const map = new Map(kept.map((t) => [t.id, t]));
+        (data.tracks || []).forEach((t: any) => map.set(t.id, t));
+        return Array.from(map.values());
+      });
+      const s = await window.electronAPI.getSettings();
+      setSettings(s);
+    } catch (err: any) {
+      alert(err.message || 'Failed to sync SoundCloud');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const openPlaylist = async (playlist: any) => {
     setSelectedPlaylist(playlist);
     setTracks([]);
@@ -134,14 +172,16 @@ export default function Library() {
   const disconnect = async (service: string) => {
     if (service === 'spotify') {
       await window.electronAPI.spotifyLogout();
-    } else {
+    } else if (service === 'youtube') {
       await window.electronAPI.youTubeLogout();
+    } else if (service === 'soundcloud') {
+      await window.electronAPI.soundCloudLogout();
     }
     const s = await window.electronAPI.getSettings();
     setSettings(s);
   };
 
-  const hasAnyConnection = settings.spotifyConnected || settings.youtubeConnected;
+  const hasAnyConnection = settings.spotifyConnected || settings.youtubeConnected || settings.soundcloudConnected;
 
   return (
     <div className="flex h-full flex-col">
@@ -181,6 +221,13 @@ export default function Library() {
                   onConnect={connectYouTube}
                   connecting={connecting}
                 />
+                <ConnectCard
+                  icon={<Cloud size={28} />}
+                  title="Connect SoundCloud"
+                  description="Sign in with SoundCloud to sync your playlists and liked tracks."
+                  onConnect={connectSoundCloud}
+                  connecting={connecting}
+                />
               </div>
             )}
 
@@ -195,6 +242,11 @@ export default function Library() {
                   {settings.youtubeConnected && (
                     <ActionButton onClick={() => disconnect('youtube')} icon={<Unlink size={14} />}>
                       Disconnect YouTube
+                    </ActionButton>
+                  )}
+                  {settings.soundcloudConnected && (
+                    <ActionButton onClick={() => disconnect('soundcloud')} icon={<Unlink size={14} />}>
+                      Disconnect SoundCloud
                     </ActionButton>
                   )}
                   <ActionButton onClick={syncSpotify} icon={syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}>
@@ -266,7 +318,8 @@ function PlaylistCard({ playlist, onClick }: { playlist: any; onClick: () => voi
       <div className="p-2">
         <div className="truncate text-sm font-semibold">{playlist.name}</div>
         <div className="truncate text-xs text-muted">
-          {playlist.owner} · {playlist.source === 'spotify' ? 'Spotify' : 'YouTube'}
+          {playlist.owner} ·{' '}
+          {playlist.source === 'spotify' ? 'Spotify' : playlist.source === 'soundcloud' ? 'SoundCloud' : 'YouTube'}
         </div>
       </div>
     </motion.div>
@@ -326,7 +379,8 @@ function PlaylistDetail({
 
       <h2 className="mb-1 text-xl font-bold text-accent">{playlist.name}</h2>
       <p className="mb-4 text-sm text-muted">
-        {playlist.trackCount} tracks · {playlist.source === 'spotify' ? 'Spotify' : 'YouTube'}
+        {playlist.trackCount} tracks ·{' '}
+        {playlist.source === 'spotify' ? 'Spotify' : playlist.source === 'soundcloud' ? 'SoundCloud' : 'YouTube'}
       </p>
 
       <div className="flex flex-col gap-1">
@@ -337,7 +391,7 @@ function PlaylistDetail({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03, duration: 0.2 }}
             onClick={() => {
-            if (playlist.source === 'youtube') {
+            if (playlist.source === 'youtube' || playlist.source === 'soundcloud') {
               const idx = tracks.findIndex((qt) => qt.id === t.id);
               playback.setYoutubeQueue(tracks, idx >= 0 ? idx : 0);
             }
@@ -352,7 +406,7 @@ function PlaylistDetail({
               <div className="truncate text-sm font-medium">{t.name}</div>
               <div className="truncate text-xs text-muted">{t.artist}</div>
             </div>
-            {t.source === 'youtube' && <AddToPlaylist track={t} onAdded={loadData} />}
+            {(t.source === 'youtube' || t.source === 'soundcloud') && <AddToPlaylist track={t} onAdded={loadData} />}
           </motion.div>
         ))}
         {tracks.length === 0 && <p className="text-sm text-muted">Loading tracks...</p>}

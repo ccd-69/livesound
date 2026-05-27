@@ -72,5 +72,15 @@ interface Window {
     nextMedia: () => Promise<void>;
     previousMedia: () => Promise<void>;
 
+    // Listening History
+    appendHistoryEvent: (event: any) => Promise<void>;
+    finalizeHistoryEvent: (trackId: string, endedAt: number) => Promise<void>;
+    loadHistory: () => Promise<any[]>;
+    clearHistory: () => Promise<void>;
+
+    // Related Tracks / Autoplay
+    youtubeGetRelated: (videoId: string, maxResults?: number) => Promise<any[]>;
+    spotifyGetRecommendations: (seedTrackId: string, limit?: number) => Promise<any[]>;
+
   };
 }

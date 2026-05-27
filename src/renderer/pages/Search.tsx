@@ -46,7 +46,7 @@ export default function Search() {
   };
 
   const totalCount = results.tracks.length + results.albums.length + results.playlists.length;
-  const hasConnection = settings.spotifyConnected || settings.youtubeConnected;
+  const hasConnection = settings.spotifyConnected || settings.youtubeConnected || settings.soundcloudConnected;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
@@ -89,7 +89,7 @@ export default function Search() {
       )}
 
       {!hasConnection && (
-        <p className="text-sm text-muted">Connect Spotify or YouTube Music in the Library to enable search.</p>
+        <p className="text-sm text-muted">Connect Spotify, YouTube Music, or SoundCloud in the Library to enable search.</p>
       )}
 
       <AnimatePresence>
@@ -137,10 +137,11 @@ export default function Search() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{t.name}</div>
                       <div className="truncate text-xs text-muted">
-                        {t.artist} · {t.source === 'spotify' ? 'Spotify' : 'YouTube'}
+                        {t.artist} ·{' '}
+                        {t.source === 'spotify' ? 'Spotify' : t.source === 'soundcloud' ? 'SoundCloud' : 'YouTube'}
                       </div>
                     </div>
-                    {t.source === 'youtube' && <AddToPlaylist track={t} />}
+                    {(t.source === 'youtube' || t.source === 'soundcloud') && <AddToPlaylist track={t} />}
                   </motion.div>
                 ))}
                 {results.tracks.length === 0 && <p className="text-sm text-muted">No tracks found.</p>}
@@ -194,7 +195,8 @@ export default function Search() {
                     <div className="p-2">
                       <div className="truncate text-sm font-semibold">{p.name}</div>
                       <div className="truncate text-xs text-muted">
-                        {p.owner} · {p.source === 'spotify' ? 'Spotify' : 'YouTube'}
+                        {p.owner} ·{' '}
+                        {p.source === 'spotify' ? 'Spotify' : p.source === 'soundcloud' ? 'SoundCloud' : 'YouTube'}
                       </div>
                     </div>
                   </motion.div>

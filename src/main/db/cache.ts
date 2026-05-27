@@ -123,3 +123,52 @@ export function clearCache() {
     if (fs.existsSync(p)) fs.unlinkSync(p);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Listening History                                                  */
+/* ------------------------------------------------------------------ */
+
+const MAX_HISTORY = 5000;
+
+export interface HistoryEvent {
+  id: string;
+  trackId: string;
+  name: string;
+  artist: string;
+  album?: string;
+  image?: string;
+  source: string;
+  startedAt: number;
+  endedAt?: number;
+  durationMs?: number;
+}
+
+export function appendHistoryEvent(event: HistoryEvent) {
+  const existing = readJson<HistoryEvent[]>('history');
+  existing.push(event);
+  if (existing.length > MAX_HISTORY) {
+    existing.splice(0, existing.length - MAX_HISTORY);
+  }
+  writeJson('history', existing);
+}
+
+export function finalizeHistoryEvent(trackId: string, endedAt: number) {
+  const existing = readJson<HistoryEvent[]>('history');
+  for (let i = existing.length - 1; i >= 0; i--) {
+    const e = existing[i];
+    if (e.trackId === trackId && !e.endedAt) {
+      e.endedAt = endedAt;
+      e.durationMs = endedAt - e.startedAt;
+      writeJson('history', existing);
+      return;
+    }
+  }
+}
+
+export function loadHistory(): HistoryEvent[] {
+  return readJson<HistoryEvent[]>('history');
+}
+
+export function clearHistory() {
+  writeJson('history', []);
+}

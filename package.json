@@ -1,12 +1,11 @@
 {
   "name": "livesound",
   "version": "1.0.6",
-  "description": "Unified media player for Spotify and YouTube Music",
+  "description": "Unified media player for Spotify, YouTube Music, and SoundCloud",
   "author": "ccd-69",
   "main": "dist/main/main.js",
   "type": "module",
   "scripts": {
-    "predev": "npx kill-port 5173 2> nul || exit 0",
     "dev": "concurrently \"npm:dev:vite\" \"npm:dev:electron\"",
     "dev:vite": "vite --config vite.renderer.config.ts",
     "dev:electron": "npm run build:main && npm run build:preload && cross-env NODE_ENV=development electron . --remote-debugging-port=9222",
@@ -119,7 +118,7 @@
       "desktop": {
         "entry": {
           "Name": "LiveSound",
-          "Comment": "Unified media player for Spotify and YouTube Music",
+          "Comment": "Unified media player for Spotify, YouTube Music, and SoundCloud",
           "Categories": "AudioVideo;Audio;Player;",
           "StartupWMClass": "LiveSound"
         }
@@ -127,7 +126,7 @@
       "maintainer": "ccd-69",
       "vendor": "ccd-69",
       "synopsis": "Unified media player",
-      "description": "A unified media player integrating Spotify and YouTube Music with custom themes."
+      "description": "A unified media player integrating Spotify, YouTube Music, and SoundCloud with custom themes and visualizations."
     },
     "publish": {
       "provider": "github",

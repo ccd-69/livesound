@@ -116,4 +116,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   nextMedia: () => ipcRenderer.invoke('media-next-from-mini'),
   previousMedia: () => ipcRenderer.invoke('media-previous-from-mini'),
 
+  // Listening History
+  appendHistoryEvent: (event: any) => ipcRenderer.invoke('append-history-event', event),
+  finalizeHistoryEvent: (trackId: string, endedAt: number) => ipcRenderer.invoke('finalize-history-event', trackId, endedAt),
+  loadHistory: () => ipcRenderer.invoke('load-history'),
+  clearHistory: () => ipcRenderer.invoke('clear-history'),
+
+  // Related Tracks / Autoplay
+  youtubeGetRelated: (videoId: string, maxResults?: number) => ipcRenderer.invoke('youtube-get-related', videoId, maxResults),
+  spotifyGetRecommendations: (seedTrackId: string, limit?: number) => ipcRenderer.invoke('spotify-get-recommendations', seedTrackId, limit),
+
 });

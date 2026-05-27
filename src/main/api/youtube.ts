@@ -264,6 +264,28 @@ export async function getVideoComments(videoId: string): Promise<any[]> {
   }, 5, 1000);
 }
 
+export async function getRelatedVideos(videoId: string, maxResults = 10): Promise<any[]> {
+  return withRateLimit('youtube:related', async () => {
+    const token = await youtubeAuth.getValidAccessToken();
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&relatedToVideoId=${videoId}&maxResults=${maxResults}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) throw new Error(`YouTube related videos fetch failed: ${res.status}`);
+    const data = await res.json();
+    return (data.items || []).map((item: any) => ({
+      id: item.id?.videoId || item.id,
+      name: item.snippet?.title || 'Untitled',
+      artist: item.snippet?.channelTitle || 'YouTube',
+      album: '',
+      durationMs: 0,
+      image: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || '',
+      source: 'youtube',
+      uri: `https://music.youtube.com/watch?v=${item.id?.videoId || item.id}`,
+    }));
+  }, 3, 1000);
+}
+
 export async function postVideoComment(videoId: string, text: string): Promise<void> {
   return withRateLimit('youtube:post', async () => {
     const token = await youtubeAuth.getValidAccessToken();

@@ -387,6 +387,22 @@ export default function Settings() {
           </div>
         </Section>
 
+        {/* Autoplay */}
+        <Section icon={<PlayCircle size={18} />} title="Autoplay">
+          <div className="flex flex-col gap-3">
+            <ToggleRow
+              label="Autoplay Related Tracks"
+              description="Automatically play related tracks when the current track ends"
+              checked={settings.autoplayRelated ?? false}
+              onChange={(v) => update('autoplayRelated', v)}
+            />
+            <p className="text-xs text-muted">
+              When enabled, LiveSound will fetch related tracks from YouTube or Spotify
+              recommendations when your queue runs out and automatically continue playing.
+            </p>
+          </div>
+        </Section>
+
         {/* Visualizers */}
         <Section icon={<Activity size={18} />} title="Visualizers">
           <div className="flex flex-col gap-3">
@@ -402,6 +418,30 @@ export default function Settings() {
               checked={settings.showSpectrumAnalyzer ?? false}
               onChange={(v) => update('showSpectrumAnalyzer', v)}
             />
+            {settings.showSpectrumAnalyzer && (
+              <div className="flex flex-col gap-2 pt-1">
+                <p className="text-xs text-muted">Visualizer Mode</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: 'spectrum', label: 'Spectrum Bars' },
+                    { key: 'circular', label: 'Circular' },
+                    { key: 'waveform', label: 'Waveform' },
+                  ].map((mode) => (
+                    <button
+                      key={mode.key}
+                      onClick={() => update('visualizerMode', mode.key)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        settings.visualizerMode === mode.key
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-border bg-transparent text-muted hover:bg-hover hover:text-text'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Section>
 

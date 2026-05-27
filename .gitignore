@@ -2,9 +2,11 @@
 node_modules/
 
 # Build outputs
-build/
 dist/
 dist-installer/
+
+# Build resources (electron-builder assets) are kept in build/
+# Do NOT ignore build/ — it contains entitlements, icons, NSIS scripts, etc.
 
 # Environment variables
 .env
