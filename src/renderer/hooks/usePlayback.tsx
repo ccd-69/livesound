@@ -2,6 +2,94 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { useNavigate } from 'react-router-dom';
 import { useSpotifyPlayer } from './useSpotify';
 
+/* ------------------------------------------------------------------ */
+/* Media Session helpers                                               */
+/* ------------------------------------------------------------------ */
+
+function getTrackImage(track: any): { src: string; sizes?: string; type?: string }[] {
+  if (!track) return [];
+  const url =
+    track.album?.images?.[0]?.url ||
+    track.image ||
+    track.thumbnail ||
+    track.album?.images?.[1]?.url ||
+    '';
+  return url ? [{ src: url, sizes: '512x512', type: 'image/jpeg' }] : [];
+}
+
+function getTrackTitle(track: any): string {
+  return track?.name || track?.title || 'Unknown Title';
+}
+
+function getTrackArtist(track: any): string {
+  if (track?.artists) {
+    return track.artists.map((a: any) => a.name).join(', ');
+  }
+  return track?.artist || track?.channelTitle || 'Unknown Artist';
+}
+
+function getTrackAlbum(track: any): string {
+  return track?.album?.name || track?.album || '';
+}
+
+function updateMediaSession(
+  track: any,
+  isPlaying: boolean,
+  handlers: {
+    onPlay: () => void;
+    onPause: () => void;
+    onNext: () => void;
+    onPrevious: () => void;
+    onSeek: (details: MediaSessionActionDetails) => void;
+  }
+) {
+  if (!('mediaSession' in navigator)) {
+    console.warn('[MediaSession] API not supported in this browser');
+    return;
+  }
+
+  const ms = navigator.mediaSession;
+
+  ms.metadata = new MediaMetadata({
+    title: getTrackTitle(track),
+    artist: getTrackArtist(track),
+    album: getTrackAlbum(track),
+    artwork: getTrackImage(track),
+  });
+
+  ms.playbackState = isPlaying ? 'playing' : 'paused';
+
+  ms.setActionHandler('play', handlers.onPlay);
+  ms.setActionHandler('pause', handlers.onPause);
+  ms.setActionHandler('nexttrack', handlers.onNext);
+  ms.setActionHandler('previoustrack', handlers.onPrevious);
+  ms.setActionHandler('seekto', handlers.onSeek);
+  ms.setActionHandler('seekbackward', (details) => {
+    handlers.onSeek({
+      ...details,
+      seekTime: (details.seekOffset ?? 10) * -1,
+      fastSeek: false,
+    } as MediaSessionActionDetails);
+  });
+  ms.setActionHandler('seekforward', (details) => {
+    handlers.onSeek({
+      ...details,
+      seekTime: details.seekOffset ?? 10,
+      fastSeek: false,
+    } as MediaSessionActionDetails);
+  });
+
+  console.log('[MediaSession] Updated:', getTrackTitle(track), '-', getTrackArtist(track), isPlaying ? '(playing)' : '(paused)');
+}
+
+function clearMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = null;
+  navigator.mediaSession.playbackState = 'none';
+}
+
+/* ------------------------------------------------------------------ */
+
 export interface YoutubeController {
   play: () => void;
   pause: () => void;
@@ -394,6 +482,28 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   const isSpotifyPlaying = !spotify.paused && !!spotify.currentTrack;
   const activeTrack = isSpotifyPlaying ? spotify.currentTrack : (youtubeCurrentTrack || spotify.currentTrack);
+
+  // ── Media Session API ──────────────────────────────────────────
+  useEffect(() => {
+    if (!activeTrack) {
+      clearMediaSession();
+      return;
+    }
+    updateMediaSession(activeTrack, isSpotifyPlaying || isYouTubePlaying, {
+      onPlay: () => play(),
+      onPause: () => pause(),
+      onNext: () => next(),
+      onPrevious: () => previous(),
+      onSeek: (details) => {
+        const target =
+          details.seekTime ??
+          (isSpotifyPlaying
+            ? spotify.position + (details.seekOffset || 0) * 1000
+            : youtubeProgress + (details.seekOffset || 0) * 1000);
+        if (target >= 0) seek(target);
+      },
+    });
+  }, [activeTrack, isSpotifyPlaying, isYouTubePlaying, play, pause, next, previous, seek, spotify.position, youtubeProgress]);
 
   const isYouTubeActive = !!youtubeCurrentTrack;
   const value: PlaybackState = {
