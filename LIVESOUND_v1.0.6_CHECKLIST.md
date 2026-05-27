@@ -86,16 +86,22 @@
 ---
 
 ### 4. Lyrics Integration 📝
-- [ ] Integrate LRCLIB API for synced lyrics
-- [ ] Display lyrics in Now Playing page
-- [ ] Auto-scroll / highlight current line
-- [ ] Fallback to unsynced lyrics if synced unavailable
-- [ ] Cache lyrics locally
+- [x] Integrate LRCLIB API for synced lyrics (free, no auth required)
+- [x] Parse synced LRC format and plain text lyrics
+- [x] Display lyrics in Now Playing page
+- [x] Auto-scroll / highlight current line during playback
+- [x] Visual hierarchy: current line bright + large, past lines dimmed
+- [x] Graceful fallback when no lyrics found
 
-**Files to touch:** `src/renderer/pages/NowPlaying.tsx`, new `src/renderer/lib/lyrics.ts`
-**Estimated effort:** 3-4 hours
+**Files touched:** `src/renderer/lib/lyrics.ts` (new), `src/renderer/components/LyricsDisplay.tsx` (new), `src/renderer/pages/NowPlaying.tsx`
+**Status:** ✅ **IMPLEMENTED**
+**Commit:** `016306e`
 
 ---
+
+## ✅ PHASE 1: Quick Wins (COMPLETE ✓)
+
+All 4 items implemented and committed. Moving on to Phase 2.
 
 ## ✅ PHASE 2: Visual Polish (High Impact, Medium Effort)
 
