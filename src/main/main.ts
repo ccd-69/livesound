@@ -1,4 +1,13 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, shell, WebContentsView, session, powerMonitor, protocol, desktopCapturer } from 'electron';
+import path from 'path';
+
+// CRITICAL: Set a stable userData path BEFORE any imports that use app.getPath('userData').
+// In dev mode, app.getPath('userData') defaults to %APPDATA%/Electron, which is DIFFERENT
+// from production (%APPDATA%/LiveSound). This causes all settings, playlists, and tokens
+// to "disappear" when switching between dev and the packaged EXE.
+const stableUserData = path.join(app.getPath('appData'), 'LiveSound');
+app.setPath('userData', stableUserData);
+
 import http from 'http';
 import fs from 'fs';
 import os from 'os';
@@ -9,7 +18,6 @@ import {
   managePowerState,
   auditProcesses,
 } from '@yawlabs/electron-optimize';
-import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { loadSettings, saveSettings } from './store/settings.js';
 import * as spotify from './auth/spotify.js';
