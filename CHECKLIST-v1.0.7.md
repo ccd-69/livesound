@@ -90,15 +90,10 @@
 ---
 
 ## In Progress
-- **Phase 1** — FX Knobs
+- **Phase 2** — Beat Detection
 
 ## Completed
 - [x] Checkpoint tag created: `checkpoint-v1.0.7-start`
 - [x] Checklist file created
-- [x] Phase 0.1 — AudioEngine singleton (`src/renderer/audio/engine.ts`)
-- [x] Phase 0.2 — Integrated with `usePlayback.tsx` (SoundCloud bridge + volume)
-- [x] Phase 0.3 — Master compressor added to graph
-- [x] Phase 0.4 — AnalyserNode for visualizer (`VisualizerCanvas.tsx` updated)
-- [x] Phase 0.5 — Suspend/resume on `visibilitychange`
-- [x] Phase 0.6 — Graceful fallback (engine fails silently, direct audio still works)
-- [x] Phase 0.7 — Build passes, no regressions
+- [x] Phase 0 — Audio Bridge (engine, playback integration, visualizer, lifecycle)
+- [x] Phase 1 — FX Knobs (Filter, Delay, Reverb, Flanger + FX Rack UI)

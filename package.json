@@ -170,6 +170,7 @@
     "react-dom": "^19.2.0",
     "react-player": "^3.4.0",
     "react-router-dom": "^7.6.0",
+    "realtime-bpm-analyzer": "^5.0.13",
     "soundcloud-fetch": "^1.2.0",
     "tailwind-merge": "^3.6.0",
     "youtube-dl-exec": "^3.1.7"

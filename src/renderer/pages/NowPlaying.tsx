@@ -21,6 +21,7 @@ import {
 import { usePlayback } from '../hooks/usePlayback';
 import VisualizerCanvas, { VisualizerMode } from '../components/VisualizerCanvas';
 import FXRack from '../components/FXRack';
+import BPMDisplay from '../components/BPMDisplay';
 import LyricsDisplay from '../components/LyricsDisplay';
 
 function formatTime(ms: number) {
@@ -172,6 +173,10 @@ export default function NowPlaying() {
           )}
 
           <FXRack />
+
+          <div className="flex justify-center">
+            <BPMDisplay />
+          </div>
 
           {/* Track Info */}
           <div className="flex flex-col items-center gap-1 text-center">
