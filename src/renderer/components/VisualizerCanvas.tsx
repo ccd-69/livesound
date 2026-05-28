@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { usePlayback } from '../hooks/usePlayback';
-import { getAnalyser, getSampleRate, startAudioCapture, stopAudioCapture } from '../lib/audioAnalyser';
+import { getAnalyser, getSampleRate, initEngine } from '../audio/engine';
 
 export type VisualizerMode = 'spectrum' | 'circular' | 'waveform';
 
@@ -309,13 +309,10 @@ export default function VisualizerCanvas({
 
   useEffect(() => {
     if (!getAnalyser()) {
-      startAudioCapture().catch((e) => {
-        console.error('[VisualizerCanvas] startAudioCapture failed:', e);
+      initEngine().catch((e) => {
+        console.error('[VisualizerCanvas] initEngine failed:', e);
       });
     }
-    return () => {
-      stopAudioCapture();
-    };
   }, []);
 
   useEffect(() => {

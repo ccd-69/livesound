@@ -17,6 +17,7 @@
 - **Content Security Policy** updated to allow SoundCloud CDN domains (`*.sndcdn.com`).
 - Added `webSecurity: false` on the main `BrowserWindow` to allow cross-origin audio playback from SoundCloud.
 - Service status pills in Library now act as connect/disconnect toggle buttons.
+- **Data persistence fix** — `userData` directory is now hardcoded to `%APPDATA%/LiveSound` in both dev and production. Previously, dev mode saved to `%APPDATA%/Electron` while the packaged EXE saved to `%APPDATA%/LiveSound`, causing playlists, settings, and auth tokens to disappear after switching between them.
 
 ### Known Issues
 - **Spotify Premium Required** — Spotify now requires an active Premium subscription on the developer account to access the Web API. A notice is shown in the Library panel.

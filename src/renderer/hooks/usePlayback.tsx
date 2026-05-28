@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpotifyPlayer } from './useSpotify';
+import { bridgeAudioElement, unbridgeAudioElement, initEngine, setMasterVolume } from '../audio/engine';
 
 /* ------------------------------------------------------------------ */
 /* Media Session helpers                                               */
@@ -163,6 +164,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       }
       setAutoplayEnabled(s.autoplayRelated ?? false);
     });
+
+    // Suspend/resume AudioEngine on visibility change
+    const handleVis = () => {
+      if (document.hidden) {
+        import('../audio/engine').then((m) => m.suspend());
+      } else {
+        import('../audio/engine').then((m) => m.resume());
+      }
+    };
+    document.addEventListener('visibilitychange', handleVis);
+    return () => document.removeEventListener('visibilitychange', handleVis);
   }, []);
 
   const setYoutubeController = useCallback((ctrl: YoutubeController | null) => {
@@ -182,6 +194,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     setSoundcloudProgress(0);
     setSoundcloudDuration(0);
     if (soundcloudAudioRef.current) {
+      unbridgeAudioElement(soundcloudAudioRef.current);
       soundcloudAudioRef.current.pause();
       soundcloudAudioRef.current.src = '';
     }
@@ -354,6 +367,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
           soundcloudAudioRef.current = new Audio();
         }
         const audio = soundcloudAudioRef.current;
+        // Initialize audio engine and bridge this element for FX/analysis
+        initEngine().then(() => {
+          bridgeAudioElement(audio);
+          setMasterVolume(volume);
+        }).catch(() => {});
         audio.volume = volume;
 
         window.electronAPI.soundCloudGetStreamUrl(track.id).then((res: any) => {
@@ -573,6 +591,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     (v: number) => {
       setVolumeState(v);
       spotify.setVolume(v);
+      setMasterVolume(v);
       if (soundcloudAudioRef.current) {
         soundcloudAudioRef.current.volume = v;
       }
