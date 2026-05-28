@@ -23,16 +23,29 @@ export default function Search() {
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState<'tracks' | 'albums' | 'playlists'>('tracks');
   const [musicOnly, setMusicOnly] = useState(false);
+  const [platforms, setPlatforms] = useState({
+    spotify: true,
+    youtube: true,
+    soundcloud: true,
+  });
 
   useEffect(() => {
-    window.electronAPI.getSettings().then(setSettings);
+    window.electronAPI.getSettings().then((s) => {
+      setSettings(s);
+      // Default platforms based on auth state
+      setPlatforms({
+        spotify: !!s.spotifyConnected,
+        youtube: !!s.youtubeConnected,
+        soundcloud: true, // always available via free API
+      });
+    });
   }, []);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const res = await window.electronAPI.searchAll(query.trim(), musicOnly);
+      const res = await window.electronAPI.searchAll(query.trim(), musicOnly, platforms);
       setResults(res);
     } catch {
       // ignore
@@ -45,8 +58,11 @@ export default function Search() {
     if (e.key === 'Enter') handleSearch();
   };
 
+  const togglePlatform = (key: keyof typeof platforms) => {
+    setPlatforms((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const totalCount = results.tracks.length + results.albums.length + results.playlists.length;
-  const hasConnection = settings.spotifyConnected || settings.youtubeConnected || settings.soundcloudConnected;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
@@ -61,36 +77,63 @@ export default function Search() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search tracks, albums, artists, or paste a YouTube URL..."
-            disabled={!hasConnection}
-            className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-text outline-none transition-colors placeholder:text-muted focus:border-accent disabled:opacity-50"
+            className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-text outline-none transition-colors placeholder:text-muted focus:border-accent"
           />
         </div>
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={handleSearch}
-          disabled={!hasConnection || loading}
+          disabled={loading}
           className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {loading ? <Loader2 size={18} className="animate-spin" /> : 'Search'}
         </motion.button>
       </div>
 
-      {settings.youtubeConnected && (
-        <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-muted">
-          <input
-            type="checkbox"
-            checked={musicOnly}
-            onChange={(e) => setMusicOnly(e.target.checked)}
-            className="accent-accent cursor-pointer"
-          />
-          Music videos only
-        </label>
-      )}
-
-      {!hasConnection && (
-        <p className="text-sm text-muted">Connect Spotify, YouTube Music, or SoundCloud in the Library to enable search.</p>
-      )}
+      {/* Platform filters */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted">Platforms:</span>
+        {(
+          [
+            { key: 'spotify', label: 'Spotify', color: 'text-green-400', border: 'border-green-400/30', needsAuth: true },
+            { key: 'youtube', label: 'YouTube', color: 'text-red-400', border: 'border-red-400/30', needsAuth: true },
+            { key: 'soundcloud', label: 'SoundCloud', color: 'text-orange-400', border: 'border-orange-400/30', needsAuth: false },
+          ] as const
+        ).map((p) => {
+          const connected = p.needsAuth ? !!settings[`${p.key}Connected`] : true;
+          const disabled = !connected;
+          return (
+            <button
+              key={p.key}
+              onClick={() => !disabled && togglePlatform(p.key)}
+              title={disabled ? `Connect ${p.label} in Library to enable search` : ''}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                disabled
+                  ? 'cursor-not-allowed border-border bg-transparent text-muted/50'
+                  : platforms[p.key]
+                  ? `${p.border} bg-accent/10 ${p.color}`
+                  : 'border-border bg-transparent text-muted'
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${platforms[p.key] && !disabled ? 'bg-current' : 'bg-hover'}`} />
+              {p.label}
+              {disabled && <span className="ml-0.5 text-[10px] opacity-60">(connect)</span>}
+            </button>
+          );
+        })}
+        {settings.youtubeConnected && (
+          <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={musicOnly}
+              onChange={(e) => setMusicOnly(e.target.checked)}
+              className="accent-accent cursor-pointer"
+            />
+            Music only
+          </label>
+        )}
+      </div>
 
       <AnimatePresence>
         {totalCount > 0 && (
@@ -129,7 +172,7 @@ export default function Search() {
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-hover">
                       {t.image ? (
-                        <img src={t.image} alt="" className="h-full w-full object-cover" />
+                        <img src={t.image} alt="" className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <Disc size={18} className="text-muted" />
                       )}
@@ -141,7 +184,7 @@ export default function Search() {
                         {t.source === 'spotify' ? 'Spotify' : t.source === 'soundcloud' ? 'SoundCloud' : 'YouTube'}
                       </div>
                     </div>
-                    {(t.source === 'youtube' || t.source === 'soundcloud') && <AddToPlaylist track={t} />}
+                    <AddToPlaylist track={t} />
                   </motion.div>
                 ))}
                 {results.tracks.length === 0 && <p className="text-sm text-muted">No tracks found.</p>}
@@ -158,7 +201,7 @@ export default function Search() {
                   >
                     <div className="aspect-square bg-hover overflow-hidden">
                       {a.image ? (
-                        <img src={a.image} alt={a.name} className="h-full w-full object-cover" />
+                        <img src={a.image} alt={a.name} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <div className="grid h-full place-items-center text-muted">
                           <Disc3 size={32} />
@@ -185,7 +228,7 @@ export default function Search() {
                   >
                     <div className="aspect-square bg-hover overflow-hidden">
                       {p.image ? (
-                        <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                        <img src={p.image} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <div className="grid h-full place-items-center text-muted">
                           <ListMusic size={32} />

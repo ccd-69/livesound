@@ -1,25 +1,27 @@
 # LiveSound Release Notes
 
-## v1.0.6 (2026-05-27)
+## v1.0.6 (2026-05-28)
 
 ### New Features
-- **Enhanced Visualizations** — Three visualizer modes: Spectrum Bars, Circular, and Waveform. Switch modes in Now Playing or Settings.
-- **Listening History** — Track every song you play with time-filtered stats (All Time, Today, This Week). View Total Time, Tracks Played, Top Track, and Top Artist.
-- **SoundCloud Integration** — Connect your SoundCloud account to browse playlists, liked tracks, and search. Playback via progressive MP3 streams.
+- **SoundCloud Free Integration** — Full search, browse, and playback via SoundCloud's public API. No developer account or Go+ subscription required. Artwork and progressive MP3 streams work out of the box.
+- **Local Playlists** — Create cross-platform playlists that can hold tracks from Spotify, YouTube, and SoundCloud. Add any track to a local playlist from the search results or Now Playing queue.
+- **Platform Search Filters** — Toggle which platforms to search (Spotify, YouTube, SoundCloud) with auth-aware disabled states.
+- **Channel-First YouTube Search** — YouTube results now prioritize an artist's official channel uploads, supplemented by a refined generic search. Shorts and livestreams are filtered out.
 - **Autoplay Related Tracks** — Automatically plays related videos when a YouTube queue ends, and Spotify recommendations when a Spotify track ends.
-- **Persistent Background Playback** — Audio keeps playing when you navigate away from Now Playing to Library, Search, History, or Settings.
+- **Listening History** — Track every song you play with time-filtered stats (All Time, Today, This Week). View Total Time, Tracks Played, Top Track, and Top Artist.
 
 ### Improvements
-- Updated app branding to include SoundCloud alongside Spotify and YouTube Music.
-- Added cross-platform build assets (tray icon, Linux icon sizes).
-- Added `LICENSE.txt` and `README.md`.
-- Fixed `.gitignore` to include essential `build/` resources.
-- Added dev process cleanup (`npm run kill-dev`) and `--kill-others` on `concurrently` for cleaner dev server shutdown.
+- **Add to Playlist** now works for all platforms, not just YouTube.
+- **SoundCloud playback** uses direct `fetch()` in the main process for reliable stream URL resolution.
+- **Spotify auth** rewritten to intercept OAuth redirects inside the popup window — no local HTTPS server needed.
+- **Content Security Policy** updated to allow SoundCloud CDN domains (`*.sndcdn.com`).
+- Added `webSecurity: false` on the main `BrowserWindow` to allow cross-origin audio playback from SoundCloud.
+- Service status pills in Library now act as connect/disconnect toggle buttons.
 
 ### Known Issues
+- **Spotify Premium Required** — Spotify now requires an active Premium subscription on the developer account to access the Web API. A notice is shown in the Library panel.
 - **Mini Player does not work.** Opening the mini player will show a blank or non-functional window. To close it, right-click the LiveSound icon in the taskbar and select "Close window" (or use Task Manager).
 - Autoplay Related Tracks is implemented but may not trigger in some environments.
-- SoundCloud playback requires an Artist Pro account (or equivalent API access) for full end-to-end testing.
 
 ---
 

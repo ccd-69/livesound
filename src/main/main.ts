@@ -18,6 +18,7 @@ import * as soundcloud from './auth/soundcloud.js';
 import * as spotifyApi from './api/spotify.js';
 import * as youtubeApi from './api/youtube.js';
 import * as soundcloudApi from './api/soundcloud.js';
+import * as soundcloudFree from './api/soundcloudFree.js';
 import * as cache from './db/cache.js';
 import * as updater from './updater.js';
 import * as discordRpc from './discord/rpc.js';
@@ -165,6 +166,7 @@ async function createWindow() {
       sandbox: true,
       preload: path.join(import.meta.dirname, 'preload.js'),
       webviewTag: true,
+      webSecurity: false,
     },
   });
 
@@ -693,6 +695,20 @@ ipcMain.handle('sync-soundcloud-library', async () => {
   return { playlists, tracks };
 });
 
+ipcMain.handle('sync-soundcloud-free', async (_event, profileUrl: string) => {
+  const [playlists, tracks] = await Promise.all([
+    soundcloudFree.getUserPlaylists(profileUrl),
+    soundcloudFree.getUserLikes(profileUrl),
+  ]);
+  cache.savePlaylists(playlists.map((p) => ({ ...p, source: 'soundcloud' })), 'soundcloud');
+  cache.saveTracks(tracks.map((t) => ({ ...t, source: 'soundcloud' })), 'soundcloud');
+  return { playlists, tracks };
+});
+
+ipcMain.handle('soundcloud-free-search', async (_event, query: string) => {
+  return soundcloudFree.searchSoundCloudFree(query, 50);
+});
+
 ipcMain.handle('get-playlist-tracks', async (_event, playlistId: string, source?: string) => {
   const cached = cache.loadTracks().filter((t: any) => t.playlistId === playlistId);
   if (cached.length > 0) return cached;
@@ -705,7 +721,10 @@ ipcMain.handle('get-playlist-tracks', async (_event, playlistId: string, source?
   } else if (src === 'youtube') {
     tracks = await youtubeApi.getPlaylistTracks(playlistId);
   } else if (src === 'soundcloud') {
-    tracks = await soundcloudApi.getPlaylistTracks(playlistId);
+    tracks = await soundcloudApi.getPlaylistTracks(playlistId).catch(() => []);
+    if (!tracks.length) {
+      tracks = await soundcloudFree.getPlaylistTracksFree(playlistId);
+    }
   }
   cache.saveTracks(tracks, playlistId);
   return tracks;
@@ -720,44 +739,67 @@ ipcMain.handle('load-cached-library', () => {
 });
 
 // Search IPC
-ipcMain.handle('search-all', async (_event, query: string, musicOnly = false) => {
+ipcMain.handle('search-all', async (_event, query: string, musicOnly = false, platforms?: any) => {
+  const opts = platforms || { spotify: true, youtube: true, soundcloud: true };
   const results: { tracks: any[]; albums: any[]; playlists: any[] } = {
     tracks: [],
     albums: [],
     playlists: [],
   };
 
-  if (spotify.isAuthenticated()) {
+  const spotifyAuth = spotify.isAuthenticated();
+  const youtubeAuth = youtube.isAuthenticated();
+  const scAuth = soundcloud.isAuthenticated();
+  console.log('[SearchAll] Platform auth state — Spotify:', spotifyAuth, 'YouTube:', youtubeAuth, 'SoundCloud:', scAuth);
+  console.log('[SearchAll] Platform filters:', opts);
+
+  if (opts.spotify !== false && spotifyAuth) {
     try {
       const spotifyResults = await spotifyApi.searchSpotify(query);
+      console.log('[SearchAll] Spotify results:', spotifyResults.tracks.length, 'tracks,', spotifyResults.albums.length, 'albums,', spotifyResults.playlists.length, 'playlists');
       results.tracks.push(...spotifyResults.tracks);
       results.albums.push(...spotifyResults.albums);
       results.playlists.push(...spotifyResults.playlists);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error('[SearchAll] Spotify search error:', err.message);
     }
   }
 
-  if (youtube.isAuthenticated()) {
+  if (opts.youtube !== false && youtubeAuth) {
     try {
       const youtubeResults = await youtubeApi.searchYouTube(query, musicOnly);
+      console.log('[SearchAll] YouTube results:', youtubeResults.tracks.length, 'tracks,', youtubeResults.playlists.length, 'playlists');
       results.tracks.push(...youtubeResults.tracks);
       results.playlists.push(...youtubeResults.playlists);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error('[SearchAll] YouTube search error:', err.message);
     }
   }
 
-  if (soundcloud.isAuthenticated()) {
+  if (opts.soundcloud !== false && scAuth) {
     try {
       const scResults = await soundcloudApi.searchSoundCloud(query);
+      console.log('[SearchAll] SoundCloud official results:', scResults.tracks.length, 'tracks,', scResults.playlists.length, 'playlists');
       results.tracks.push(...scResults.tracks);
       results.playlists.push(...scResults.playlists);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      console.error('[SearchAll] SoundCloud official search error:', err.message);
     }
   }
 
+  // Always search SoundCloud via free API regardless of auth state
+  if (opts.soundcloud !== false) {
+    try {
+      const scFree = await soundcloudFree.searchSoundCloudFree(query, 50);
+      console.log('[SearchAll] SoundCloud free results:', scFree.tracks.length, 'tracks,', scFree.playlists.length, 'playlists');
+      results.tracks.push(...scFree.tracks);
+      results.playlists.push(...scFree.playlists);
+    } catch (err: any) {
+      console.error('[SearchAll] SoundCloud free search error:', err.message);
+    }
+  }
+
+  console.log('[SearchAll] Total results:', results.tracks.length, 'tracks,', results.albums.length, 'albums,', results.playlists.length, 'playlists');
   return results;
 });
 
@@ -776,6 +818,31 @@ ipcMain.handle('patch-playlist-image', (_event, playlistId: string, image: strin
 
 ipcMain.handle('append-playlist', (_event, playlist: any) => {
   cache.appendPlaylist(playlist);
+});
+
+// Local unified playlist CRUD
+ipcMain.handle('create-local-playlist', (_event, name: string, description?: string) => {
+  return cache.createLocalPlaylist(name, description || '');
+});
+
+ipcMain.handle('update-local-playlist', (_event, playlistId: string, updates: any) => {
+  return cache.updateLocalPlaylist(playlistId, updates);
+});
+
+ipcMain.handle('delete-local-playlist', (_event, playlistId: string) => {
+  return cache.deleteLocalPlaylist(playlistId);
+});
+
+ipcMain.handle('load-local-playlists', () => {
+  return cache.loadLocalPlaylists();
+});
+
+ipcMain.handle('add-track-to-local-playlist', (_event, playlistId: string, track: any) => {
+  return cache.addTrackToLocalPlaylist(playlistId, track);
+});
+
+ipcMain.handle('remove-track-from-local-playlist', (_event, playlistId: string, trackId: string) => {
+  return cache.removeTrackFromLocalPlaylist(playlistId, trackId);
 });
 
 // External links — only allow http/https to prevent arbitrary execution
@@ -906,7 +973,9 @@ ipcMain.handle('youtube-post-comment', async (_event, videoId: string, text: str
 
 ipcMain.handle('soundcloud-get-stream-url', async (_event, trackId: string) => {
   try {
-    return await soundcloudApi.getStreamUrl(trackId);
+    const official = await soundcloudApi.getStreamUrl(trackId);
+    if (official.success) return official;
+    return await soundcloudFree.getStreamUrlFree(trackId);
   } catch (error: any) {
     return { success: false, error: error.message };
   }

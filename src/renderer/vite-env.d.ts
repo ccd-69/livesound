@@ -23,6 +23,8 @@ interface Window {
     setSoundCloudCredentials: (id: string, secret: string) => Promise<void>;
     syncSoundCloudLibrary: () => Promise<{ playlists: any[]; tracks: any[] }>;
     soundCloudGetStreamUrl: (trackId: string) => Promise<{ success: boolean; url?: string; error?: string }>;
+    syncSoundCloudFree: (profileUrl: string) => Promise<{ playlists: any[]; tracks: any[] }>;
+    soundCloudFreeSearch: (query: string) => Promise<{ tracks: any[]; playlists: any[] }>;
     syncSpotifyLibrary: () => Promise<{ playlists: any[]; albums: any[] }>;
     syncYouTubeLibrary: () => Promise<{ playlists: any[] }>;
     getPlaylistTracks: (playlistId: string, source: string) => Promise<any[]>;
@@ -31,7 +33,15 @@ interface Window {
     addToYouTubePlaylist: (playlistId: string, videoId: string) => Promise<void>;
     patchPlaylistImage: (playlistId: string, image: string) => Promise<void>;
     appendPlaylist: (playlist: any) => Promise<void>;
-    searchAll: (query: string, musicOnly?: boolean) => Promise<{ tracks: any[]; albums: any[]; playlists: any[] }>;
+    searchAll: (query: string, musicOnly?: boolean, platforms?: any) => Promise<{ tracks: any[]; albums: any[]; playlists: any[] }>;
+
+    // Local unified playlists
+    createLocalPlaylist: (name: string, description?: string) => Promise<any>;
+    updateLocalPlaylist: (playlistId: string, updates: any) => Promise<any | null>;
+    deleteLocalPlaylist: (playlistId: string) => Promise<boolean>;
+    loadLocalPlaylists: () => Promise<any[]>;
+    addTrackToLocalPlaylist: (playlistId: string, track: any) => Promise<any | null>;
+    removeTrackFromLocalPlaylist: (playlistId: string, trackId: string) => Promise<any | null>;
     openExternal: (url: string) => Promise<void>;
     clearCache: () => Promise<void>;
     minimizeWindow: () => Promise<void>;

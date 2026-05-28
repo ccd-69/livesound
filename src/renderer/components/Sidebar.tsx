@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Library, Search, Settings, Palette, Clock } from 'lucide-react';
+import { Library, Search, Settings, Palette, Clock, Disc } from 'lucide-react';
 import ThemePicker from './ThemePicker';
 
 const navItems = [
   { to: '/', label: 'Library', icon: Library },
   { to: '/search', label: 'Search', icon: Search },
   { to: '/history', label: 'History', icon: Clock },
+  { to: '/now-playing', label: 'Now Playing', icon: Disc },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

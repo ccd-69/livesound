@@ -125,6 +125,82 @@ export function clearCache() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Local Playlists (Unified, cross-platform)                          */
+/* ------------------------------------------------------------------ */
+
+export function saveLocalPlaylists(playlists: any[]) {
+  writeJson('local_playlists', playlists);
+  writeJson('cache_meta_local_playlists', { updatedAt: Date.now() });
+}
+
+export function loadLocalPlaylists(): any[] {
+  return readJson<any[]>('local_playlists');
+}
+
+export function createLocalPlaylist(name: string, description = ''): any {
+  const playlists = loadLocalPlaylists();
+  const id = `livesound-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const playlist = {
+    id,
+    name,
+    description,
+    image: '',
+    owner: 'LiveSound',
+    tracks: [],
+    trackCount: 0,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    source: 'local',
+  };
+  playlists.push(playlist);
+  saveLocalPlaylists(playlists);
+  return playlist;
+}
+
+export function updateLocalPlaylist(playlistId: string, updates: Partial<{ name: string; description: string; image: string; tracks: any[] }>): any | null {
+  const playlists = loadLocalPlaylists();
+  const idx = playlists.findIndex((p) => p.id === playlistId);
+  if (idx === -1) return null;
+  const updated = { ...playlists[idx], ...updates, trackCount: updates.tracks?.length ?? playlists[idx].tracks?.length ?? 0, updatedAt: Date.now() };
+  playlists[idx] = updated;
+  saveLocalPlaylists(playlists);
+  return updated;
+}
+
+export function deleteLocalPlaylist(playlistId: string): boolean {
+  const playlists = loadLocalPlaylists();
+  const filtered = playlists.filter((p) => p.id !== playlistId);
+  if (filtered.length === playlists.length) return false;
+  saveLocalPlaylists(filtered);
+  return true;
+}
+
+export function addTrackToLocalPlaylist(playlistId: string, track: any): any | null {
+  const playlists = loadLocalPlaylists();
+  const playlist = playlists.find((p) => p.id === playlistId);
+  if (!playlist) return null;
+  if (!playlist.tracks) playlist.tracks = [];
+  // Prevent duplicates by id
+  if (playlist.tracks.some((t: any) => t.id === track.id)) return playlist;
+  playlist.tracks.push(track);
+  playlist.trackCount = playlist.tracks.length;
+  playlist.updatedAt = Date.now();
+  saveLocalPlaylists(playlists);
+  return playlist;
+}
+
+export function removeTrackFromLocalPlaylist(playlistId: string, trackId: string): any | null {
+  const playlists = loadLocalPlaylists();
+  const playlist = playlists.find((p) => p.id === playlistId);
+  if (!playlist || !playlist.tracks) return null;
+  playlist.tracks = playlist.tracks.filter((t: any) => t.id !== trackId);
+  playlist.trackCount = playlist.tracks.length;
+  playlist.updatedAt = Date.now();
+  saveLocalPlaylists(playlists);
+  return playlist;
+}
+
+/* ------------------------------------------------------------------ */
 /* Listening History                                                  */
 /* ------------------------------------------------------------------ */
 

@@ -23,8 +23,7 @@ export default function Settings() {
   const [spotifyClientId, setSpotifyClientId] = useState('');
   const [youtubeClientId, setYouTubeClientId] = useState('');
   const [youtubeClientSecret, setYouTubeClientSecret] = useState('');
-  const [soundcloudClientId, setSoundCloudClientId] = useState('');
-  const [soundcloudClientSecret, setSoundCloudClientSecret] = useState('');
+  const [soundcloudProfileUrl, setSoundCloudProfileUrl] = useState('');
   const [discordClientId, setDiscordClientId] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [updateStatus, setUpdateStatus] = useState<{
@@ -39,7 +38,7 @@ export default function Settings() {
       setSettings(s);
       setSpotifyClientId(s.spotifyClientId || '');
       setYouTubeClientId(s.youtubeClientId || '');
-      setSoundCloudClientId(s.soundcloudClientId || '');
+      setSoundCloudProfileUrl(s.soundcloudProfileUrl || '');
       setDiscordClientId(s.discordClientId || '');
     });
     window.electronAPI.getAppVersion().then(setAppVersion);
@@ -78,16 +77,12 @@ export default function Settings() {
     }
   };
 
-  const saveSoundCloudCreds = () => {
-    const next: any = { ...settings, soundcloudClientId: soundcloudClientId.trim() };
-    if (soundcloudClientSecret.trim()) {
-      next.soundcloudClientSecret = soundcloudClientSecret.trim();
-    }
+  const saveSoundCloudProfile = () => {
+    const url = soundcloudProfileUrl.trim();
+    if (!url) return;
+    const next = { ...settings, soundcloudProfileUrl: url };
     setSettings(next);
     window.electronAPI.saveSettings(next);
-    if (soundcloudClientId.trim() && soundcloudClientSecret.trim()) {
-      window.electronAPI.setSoundCloudCredentials(soundcloudClientId.trim(), soundcloudClientSecret.trim());
-    }
   };
 
   const saveDiscordId = () => {
@@ -147,9 +142,12 @@ export default function Settings() {
             </div>
             <p className="text-xs text-muted">
               Create an app at{' '}
-              <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <button
+                onClick={() => window.electronAPI.openExternal('https://developer.spotify.com/dashboard')}
+                className="text-accent hover:underline"
+              >
                 Spotify Developer Dashboard
-              </a>
+              </button>
               . Add https://localhost:8888/callback as a Redirect URI.
             </p>
 
@@ -207,9 +205,12 @@ export default function Settings() {
             </div>
             <p className="text-xs text-muted">
               Create OAuth 2.0 credentials at{' '}
-              <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <button
+                onClick={() => window.electronAPI.openExternal('https://console.cloud.google.com/apis/credentials')}
+                className="text-accent hover:underline"
+              >
                 Google Cloud Console
-              </a>
+              </button>
               . Add https://localhost:8889/callback as an authorized redirect URI and enable the YouTube Data API v3.
             </p>
 
@@ -237,57 +238,46 @@ export default function Settings() {
         </Section>
 
         {/* SoundCloud */}
-        <Section icon={<Radio size={18} />} title="SoundCloud Configuration">
+        <Section icon={<Radio size={18} />} title="SoundCloud">
           <div className="flex flex-col gap-3">
-            <label className="text-xs font-medium text-muted">Client ID</label>
-            <input
-              type="password"
-              value={soundcloudClientId}
-              onChange={(e) => setSoundCloudClientId(e.target.value)}
-              placeholder="Paste your SoundCloud Client ID"
-              className="rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
-            />
-            <label className="text-xs font-medium text-muted">Client Secret</label>
+            <label className="text-xs font-medium text-muted">Profile URL</label>
             <div className="flex gap-2">
               <input
-                type="password"
-                value={soundcloudClientSecret}
-                onChange={(e) => setSoundCloudClientSecret(e.target.value)}
-                placeholder="Paste your SoundCloud Client Secret"
+                type="text"
+                value={soundcloudProfileUrl}
+                onChange={(e) => setSoundCloudProfileUrl(e.target.value)}
+                placeholder="https://soundcloud.com/your-username"
                 className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
               />
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={saveSoundCloudCreds}
+                onClick={saveSoundCloudProfile}
                 className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-black"
               >
                 <Save size={14} /> Save
               </motion.button>
             </div>
             <p className="text-xs text-muted">
-              Create an app at{' '}
-              <a href="https://soundcloud.com/you/apps" target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                SoundCloud Developer Portal
-              </a>
-              . Add https://localhost:8890/callback as a Redirect URI.
+              Paste your SoundCloud profile URL to import liked tracks and playlists. Search and playback work automatically — no developer account needed.
             </p>
 
             <div className="flex items-center justify-between pt-1">
               <span className="text-sm">Status</span>
-              <span className={`text-sm font-medium ${settings.soundcloudConnected ? 'text-accent' : 'text-muted'}`}>
-                {settings.soundcloudConnected ? 'Connected' : 'Not connected'}
+              <span className={`text-sm font-medium ${settings.soundcloudProfileUrl ? 'text-accent' : 'text-muted'}`}>
+                {settings.soundcloudProfileUrl ? 'Profile set' : 'No profile'}
               </span>
             </div>
-            {settings.soundcloudConnected && (
+            {settings.soundcloudProfileUrl && (
               <motion.button
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                onClick={() =>
-                  window.electronAPI.soundCloudLogout().then(() =>
-                    setSettings((s: any) => ({ ...s, soundcloudConnected: false }))
-                  )
-                }
+                onClick={() => {
+                  const next = { ...settings, soundcloudProfileUrl: '', soundcloudConnected: false };
+                  setSettings(next);
+                  window.electronAPI.saveSettings(next);
+                  setSoundCloudProfileUrl('');
+                }}
                 className="mt-1 w-full rounded-lg border border-border py-2 text-sm text-text transition-colors hover:bg-hover"
               >
                 Disconnect SoundCloud
@@ -332,9 +322,12 @@ export default function Settings() {
             </div>
             <p className="text-xs text-muted">
               Create an application at{' '}
-              <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <button
+                onClick={() => window.electronAPI.openExternal('https://discord.com/developers/applications')}
+                className="text-accent hover:underline"
+              >
                 Discord Developer Portal
-              </a>
+              </button>
               . Copy the Application ID (Client ID) and paste it above. No OAuth redirect needed.
             </p>
           </div>

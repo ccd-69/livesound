@@ -359,14 +359,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
         window.electronAPI.soundCloudGetStreamUrl(track.id).then((res: any) => {
           if (res?.success && res.url) {
             audio.src = res.url;
-            audio.play().catch(() => {});
+            audio.play().catch((err) => console.error('[Playback] SoundCloud audio play error:', err));
             setIsSoundCloudPlaying(true);
             navigate('/now-playing');
           } else {
-            console.error('[Playback] Failed to get SoundCloud stream URL');
+            console.error('[Playback] Failed to get SoundCloud stream URL:', res?.error);
           }
-        }).catch(() => {
-          console.error('[Playback] Error fetching SoundCloud stream URL');
+        }).catch((err) => {
+          console.error('[Playback] Error fetching SoundCloud stream URL:', err);
         });
       }
     },
@@ -625,13 +625,23 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       setIsSoundCloudPlaying(false);
       callbacksRef.current.next();
     };
+    const onError = (e: Event) => {
+      console.error('[Playback] SoundCloud audio error:', e);
+    };
+    const onCanPlay = () => {
+      console.log('[Playback] SoundCloud audio canplay, duration:', audio.duration);
+    };
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
+    audio.addEventListener('canplay', onCanPlay);
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
+      audio.removeEventListener('canplay', onCanPlay);
     };
   }, [soundcloudCurrentTrack]);
 

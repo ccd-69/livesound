@@ -76,6 +76,12 @@ export default function PlayerBar() {
             alt="Album art"
             className="h-full w-full object-cover"
           />
+        ) : playback.currentTrack?.thumbnail ? (
+          <img
+            src={playback.currentTrack.thumbnail}
+            alt="Album art"
+            className="h-full w-full object-cover"
+          />
         ) : playback.currentTrack?.image ? (
           <img
             src={playback.currentTrack.image}
@@ -93,6 +99,7 @@ export default function PlayerBar() {
         <div className="truncate text-xs text-muted">
           {playback.currentTrack?.artists?.map((a: any) => a.name).join(', ') ||
             playback.currentTrack?.artist ||
+            playback.currentTrack?.channelTitle ||
             'Select a track to play'}
         </div>
       </div>

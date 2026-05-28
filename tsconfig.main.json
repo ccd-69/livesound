@@ -8,7 +8,8 @@
     "outDir": "dist/main",
     "rootDir": "src/main",
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": "."
   },
   "include": ["src/main/**/*.ts"],
   "exclude": ["src/main/preload.ts"]

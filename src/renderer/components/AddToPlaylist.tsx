@@ -17,8 +17,8 @@ export default function AddToPlaylist({ track, onAdded }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    window.electronAPI.loadCachedLibrary().then((lib) => {
-      setPlaylists((lib.playlists || []).filter((p: any) => p.source === 'youtube'));
+    window.electronAPI.loadLocalPlaylists().then((local) => {
+      setPlaylists(local || []);
     });
   }, [open]);
 
@@ -38,7 +38,7 @@ export default function AddToPlaylist({ track, onAdded }: Props) {
     if (!track.id) return;
     setLoading(true);
     try {
-      await window.electronAPI.addToYouTubePlaylist(playlistId, track.id);
+      await window.electronAPI.addTrackToLocalPlaylist(playlistId, track);
       onAdded?.();
       setOpen(false);
     } catch (err: any) {
@@ -52,17 +52,8 @@ export default function AddToPlaylist({ track, onAdded }: Props) {
     if (!newName.trim() || !track.id) return;
     setLoading(true);
     try {
-      const created = await window.electronAPI.createYouTubePlaylist(newName.trim());
-      await window.electronAPI.addToYouTubePlaylist(created.id, track.id);
-      await window.electronAPI.appendPlaylist({
-        id: created.id,
-        name: created.name || newName.trim(),
-        owner: 'You',
-        image: created.image || track.image || '',
-        source: 'youtube',
-        trackCount: 1,
-        createdAt: Date.now(),
-      });
+      const created = await window.electronAPI.createLocalPlaylist(newName.trim());
+      await window.electronAPI.addTrackToLocalPlaylist(created.id, track);
       onAdded?.();
       setOpen(false);
       setCreating(false);
@@ -73,8 +64,6 @@ export default function AddToPlaylist({ track, onAdded }: Props) {
       setLoading(false);
     }
   };
-
-  if (track.source !== 'youtube') return null;
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
@@ -102,7 +91,7 @@ export default function AddToPlaylist({ track, onAdded }: Props) {
           >
             {playlists.length === 0 && !creating && (
               <div className="px-1 py-2 text-xs text-muted">
-                No YouTube playlists yet.
+                No playlists yet.
               </div>
             )}
             {playlists.map((p) => (

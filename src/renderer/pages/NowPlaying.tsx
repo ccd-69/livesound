@@ -18,13 +18,8 @@ import {
   CircleDot,
   Waves,
 } from 'lucide-react';
-import { getYouTubeVideoId, convertMusicUrlToYouTube } from '../lib/utils';
 import { usePlayback } from '../hooks/usePlayback';
 import VisualizerCanvas, { VisualizerMode } from '../components/VisualizerCanvas';
-import YouTubePlayer from '../components/YouTubePlayer';
-import DirectStreamPlayer from '../components/DirectStreamPlayer';
-import WebViewPlayer from '../components/WebViewPlayer';
-import YouTubeVideoInfo from '../components/YouTubeVideoInfo';
 import LyricsDisplay from '../components/LyricsDisplay';
 
 function formatTime(ms: number) {
@@ -43,7 +38,12 @@ export default function NowPlaying() {
   const [bgGradient, setBgGradient] = useState('');
 
   const track = playback.currentTrack;
-  const albumImage = track?.album?.images?.[0]?.url;
+  const albumImage =
+    track?.album?.images?.[0]?.url ||
+    track?.thumbnail ||
+    track?.image ||
+    track?.album?.images?.[1]?.url ||
+    '';
 
   useEffect(() => {
     function refresh() {
@@ -110,58 +110,33 @@ export default function NowPlaying() {
             <ChevronDown size={28} />
           </motion.button>
 
-          {/* Album Art / YouTube Player */}
-          {playback.youtubeCurrentTrack ? (
-            <div className="w-full max-h-[50vh] aspect-video rounded-xl overflow-hidden shrink-0">
-              {playback.youtubeMode === 'iframe' && playback.youtubeCurrentTrack?.uri && (
-                <YouTubePlayer
-                  url={convertMusicUrlToYouTube(playback.youtubeCurrentTrack.uri)}
-                  playing={playback.isPlaying}
-                  className="w-full h-full"
-                />
-              )}
-              {playback.youtubeMode === 'direct-stream' && playback.youtubeCurrentTrack?.uri && (
-                <DirectStreamPlayer
-                  videoUrl={playback.youtubeCurrentTrack.uri}
-                  className="w-full h-full"
-                />
-              )}
-              {playback.youtubeMode === 'webview' && playback.youtubeCurrentTrack?.uri && (
-                <WebViewPlayer
-                  videoId={getYouTubeVideoId(playback.youtubeCurrentTrack.uri) || playback.youtubeCurrentTrack.videoId || playback.youtubeCurrentTrack.id}
-                  className="w-full h-full"
-                />
-              )}
-              {playback.youtubeMode === 'ytm-web' && (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-hover px-8 py-12 text-center h-full">
-                  <MonitorPlay size={48} className="text-accent" />
-                  <p className="text-lg font-semibold text-text">
-                    {playback.isPlaying ? 'Playing in YouTube Music' : 'Paused in YouTube Music'}
-                  </p>
-                  <p className="text-sm text-muted">The full YouTube Music web player is active in the background.</p>
-                </div>
-              )}
+          {/* Album Art / Thumbnail */}
+          <motion.div
+            className="relative aspect-square w-72 overflow-hidden rounded-2xl shadow-2xl shrink-0"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+            whileHover={{ scale: 1.02, rotate: 1 }}
+          >
+            {albumImage ? (
+              <img
+                src={albumImage}
+                alt={track?.name || 'Album art'}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-hover text-muted">
+                <Music size={64} strokeWidth={1} />
+              </div>
+            )}
+          </motion.div>
+
+          {/* ytm-web indicator pill */}
+          {playback.youtubeMode === 'ytm-web' && playback.youtubeCurrentTrack && (
+            <div className="flex items-center gap-2 rounded-full bg-hover px-3 py-1 text-xs text-muted">
+              <MonitorPlay size={14} className="text-accent" />
+              {playback.isPlaying ? 'Playing in YouTube Music' : 'Paused in YouTube Music'}
             </div>
-          ) : (
-            <motion.div
-              className="relative aspect-square w-72 overflow-hidden rounded-2xl shadow-2xl shrink-0"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-              whileHover={{ scale: 1.02, rotate: 1 }}
-            >
-              {albumImage ? (
-                <img
-                  src={albumImage}
-                  alt={track?.name || 'Album art'}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-hover text-muted">
-                  <Music size={64} strokeWidth={1} />
-                </div>
-              )}
-            </motion.div>
           )}
 
           {/* Visualizer — right below media, before any tall info sections */}
@@ -195,34 +170,27 @@ export default function NowPlaying() {
             </div>
           )}
 
-          {/* YouTube Video Info — AFTER spectrum analyzer so it can't push it out of view */}
-          {playback.youtubeCurrentTrack?.id && playback.youtubeMode !== 'ytm-web' && (
-            <YouTubeVideoInfo videoId={playback.youtubeCurrentTrack.id} />
-          )}
-
-          {/* Track Info — shown for Spotify and SoundCloud */}
-          {!playback.youtubeCurrentTrack && (
-            <div className="flex flex-col items-center gap-1 text-center">
-              <motion.h1
-                key={track?.name || 'no-track-name'}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="text-2xl font-bold text-text"
-              >
-                {track?.name || 'No track selected'}
-              </motion.h1>
-              <motion.p
-                key={track?.artists?.map((a: any) => a.name).join(', ') || track?.artist || 'no-track-artist'}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.05 }}
-                className="text-base text-muted"
-              >
-                {track?.artists?.map((a: any) => a.name).join(', ') || track?.artist}
-              </motion.p>
-            </div>
-          )}
+          {/* Track Info */}
+          <div className="flex flex-col items-center gap-1 text-center">
+            <motion.h1
+              key={track?.name || 'no-track-name'}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="text-2xl font-bold text-text"
+            >
+              {track?.name || 'No track selected'}
+            </motion.h1>
+            <motion.p
+              key={track?.artists?.map((a: any) => a.name).join(', ') || track?.artist || track?.channelTitle || 'no-track-artist'}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.05 }}
+              className="text-base text-muted"
+            >
+              {track?.artists?.map((a: any) => a.name).join(', ') || track?.artist || track?.channelTitle}
+            </motion.p>
+          </div>
 
           {/* Lyrics Display */}
           <LyricsDisplay
@@ -234,11 +202,10 @@ export default function NowPlaying() {
             isPlaying={playback.isPlaying}
           />
 
-          {/* Progress + Controls + Volume — hidden for YouTube since PlayerBar handles them */}
-          {!playback.youtubeCurrentTrack && (
-            <>
-              {/* Progress Bar */}
-              <div className="flex w-full flex-col gap-2">
+          {/* Progress + Controls + Volume */}
+          <>
+            {/* Progress Bar */}
+            <div className="flex w-full flex-col gap-2">
                 <div
                   className="group relative h-6 w-full cursor-pointer"
                   onClick={handleSeek}
@@ -314,9 +281,8 @@ export default function NowPlaying() {
                     />
                   </div>
                 </div>
-              </div>
-            </>
-          )}
+            </div>
+          </>
         </div>
 
         {/* Playlist Sidebar */}

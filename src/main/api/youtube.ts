@@ -77,6 +77,88 @@ async function fetchSearchPage(token: string, q: string, pageToken?: string, mus
   return res.json();
 }
 
+/** Search for channels matching the query and return their uploads. */
+async function fetchChannelUploads(token: string, q: string, maxItems = 20): Promise<any[]> {
+  // 1) Search for channels
+  const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+  searchUrl.searchParams.set('part', 'snippet');
+  searchUrl.searchParams.set('q', q);
+  searchUrl.searchParams.set('type', 'channel');
+  searchUrl.searchParams.set('maxResults', '5');
+  const searchRes = await fetch(searchUrl.toString(), { headers: { Authorization: `Bearer ${token}` } });
+  if (!searchRes.ok) return [];
+  const searchData = await searchRes.json();
+  const channels = (searchData.items || []).map((item: any) => item.snippet?.channelId).filter(Boolean);
+  if (channels.length === 0) return [];
+
+  // 2) Get uploads playlist id for each channel
+  const channelsUrl = new URL('https://www.googleapis.com/youtube/v3/channels');
+  channelsUrl.searchParams.set('part', 'contentDetails');
+  channelsUrl.searchParams.set('id', channels.slice(0, 3).join(','));
+  channelsUrl.searchParams.set('maxResults', '3');
+  const channelsRes = await fetch(channelsUrl.toString(), { headers: { Authorization: `Bearer ${token}` } });
+  if (!channelsRes.ok) return [];
+  const channelsData = await channelsRes.json();
+  const uploadsPlaylists: string[] = [];
+  for (const ch of channelsData.items || []) {
+    const pid = ch.contentDetails?.relatedPlaylists?.uploads;
+    if (pid) uploadsPlaylists.push(pid);
+  }
+
+  // 3) List videos from uploads playlists
+  const videos: any[] = [];
+  for (const pid of uploadsPlaylists) {
+    if (videos.length >= maxItems) break;
+    const plUrl = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+    plUrl.searchParams.set('part', 'snippet,contentDetails');
+    plUrl.searchParams.set('playlistId', pid);
+    plUrl.searchParams.set('maxResults', String(maxItems - videos.length));
+    const plRes = await fetch(plUrl.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    if (!plRes.ok) continue;
+    const plData = await plRes.json();
+    for (const item of plData.items || []) {
+      const s = item.snippet;
+      if (!s?.resourceId?.videoId) continue;
+      videos.push({
+        id: s.resourceId.videoId,
+        name: s.title || 'Untitled',
+        artist: s.videoOwnerChannelTitle || s.channelTitle || 'YouTube',
+        album: '',
+        durationMs: 0,
+        image: s.thumbnails?.medium?.url || s.thumbnails?.default?.url || '',
+        source: 'youtube',
+        uri: `https://music.youtube.com/watch?v=${s.resourceId.videoId}`,
+        _fromChannel: true,
+      });
+    }
+  }
+  return videos;
+}
+
+/** Fetch contentDetails (duration) for a batch of video ids and filter out Shorts. */
+async function enrichWithDurations(token: string, tracks: any[]): Promise<any[]> {
+  const ids = tracks.map((t) => t.id).filter(Boolean);
+  if (ids.length === 0) return tracks;
+  // batch in groups of 50
+  const enriched: any[] = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = ids.slice(i, i + 50).join(',');
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${batch}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) continue;
+    const data = await res.json();
+    for (const item of data.items || []) {
+      const dur = parseISODuration(item.contentDetails?.duration || '');
+      const track = tracks.find((t) => t.id === item.id);
+      if (track) {
+        track.durationMs = dur;
+      }
+    }
+  }
+  // Filter out Shorts (< 60s) and very long livestreams (> 2 hours)
+  return tracks.filter((t) => t.durationMs >= 60000 && t.durationMs <= 7200000);
+}
+
 export async function searchYouTube(q: string, musicOnly = false): Promise<{ tracks: any[]; playlists: any[] }> {
   return withRateLimit('youtube:search', async () => {
     const token = await youtubeAuth.getValidAccessToken();
@@ -84,7 +166,7 @@ export async function searchYouTube(q: string, musicOnly = false): Promise<{ tra
 
     if (urlInfo.type === 'video' && urlInfo.id) {
       const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${urlInfo.id}`,
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${urlInfo.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error(`YouTube video lookup failed: ${res.status}`);
@@ -96,7 +178,7 @@ export async function searchYouTube(q: string, musicOnly = false): Promise<{ tra
         name: item.snippet?.title || 'Untitled',
         artist: item.snippet?.channelTitle || 'YouTube',
         album: '',
-        durationMs: 0,
+        durationMs: parseISODuration(item.contentDetails?.duration || ''),
         image: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || '',
         source: 'youtube',
         uri: `https://music.youtube.com/watch?v=${item.id}`,
@@ -124,18 +206,22 @@ export async function searchYouTube(q: string, musicOnly = false): Promise<{ tra
       return { tracks: [], playlists: [playlist] };
     }
 
-    const tracks: any[] = [];
+    // Two-pronged search:
+    // A) Get official uploads from the artist's channel
+    const channelTracks = await fetchChannelUploads(token, q, 20);
+
+    // B) Refined generic search with "official audio" appended for better specificity
+    const refinedQuery = `${q} official audio`;
+    const genericTracks: any[] = [];
     const playlists: any[] = [];
     let pageToken: string | undefined;
     let pages = 0;
-
     do {
-      const data = await fetchSearchPage(token, q, pageToken, musicOnly);
+      const data = await fetchSearchPage(token, refinedQuery, pageToken, musicOnly);
       pages++;
-
       for (const item of data.items || []) {
         if (item.id?.kind === 'youtube#video') {
-          tracks.push({
+          genericTracks.push({
             id: item.id.videoId,
             name: item.snippet?.title || 'Untitled',
             artist: item.snippet?.channelTitle || 'YouTube',
@@ -144,6 +230,7 @@ export async function searchYouTube(q: string, musicOnly = false): Promise<{ tra
             image: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || '',
             source: 'youtube',
             uri: `https://music.youtube.com/watch?v=${item.id.videoId}`,
+            _fromChannel: false,
           });
         } else if (item.id?.kind === 'youtube#playlist') {
           playlists.push({
@@ -156,12 +243,48 @@ export async function searchYouTube(q: string, musicOnly = false): Promise<{ tra
           });
         }
       }
-
       pageToken = data.nextPageToken;
-    } while (pageToken && pages < 2);
+    } while (pageToken && pages < 1); // only 1 page to save quota
 
-    return { tracks, playlists };
-  }, 3, 1000);
+    // Merge and deduplicate (channel uploads first)
+    const seen = new Set<string>();
+    const allTracks: any[] = [];
+    for (const t of channelTracks) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        allTracks.push(t);
+      }
+    }
+    for (const t of genericTracks) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        allTracks.push(t);
+      }
+    }
+
+    // Enrich with durations and filter Shorts / long streams
+    const filtered = await enrichWithDurations(token, allTracks);
+
+    // Prioritize: channel uploads, then videos with "official" in title, then the rest
+    const scored = filtered.map((t) => {
+      let score = 0;
+      if (t._fromChannel) score += 100;
+      const lower = (t.name || '').toLowerCase();
+      if (lower.includes('official audio')) score += 50;
+      else if (lower.includes('official video')) score += 40;
+      else if (lower.includes('official')) score += 20;
+      return { t, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+
+    return {
+      tracks: scored.map((s) => {
+        const { _fromChannel, ...rest } = s.t;
+        return rest;
+      }),
+      playlists,
+    };
+  }, 5, 1000);
 }
 
 export async function createPlaylist(name: string): Promise<{ id: string; name: string; image: string; createdAt: number }> {

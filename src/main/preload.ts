@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSoundCloudCredentials: (id: string, secret: string) => ipcRenderer.invoke('set-soundcloud-credentials', id, secret),
   syncSoundCloudLibrary: () => ipcRenderer.invoke('sync-soundcloud-library'),
   soundCloudGetStreamUrl: (trackId: string) => ipcRenderer.invoke('soundcloud-get-stream-url', trackId),
+  syncSoundCloudFree: (profileUrl: string) => ipcRenderer.invoke('sync-soundcloud-free', profileUrl),
+  soundCloudFreeSearch: (query: string) => ipcRenderer.invoke('soundcloud-free-search', query),
 
   // Library
   syncSpotifyLibrary: () => ipcRenderer.invoke('sync-spotify-library'),
@@ -36,8 +38,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   patchPlaylistImage: (playlistId: string, image: string) => ipcRenderer.invoke('patch-playlist-image', playlistId, image),
   appendPlaylist: (playlist: any) => ipcRenderer.invoke('append-playlist', playlist),
 
+  // Local unified playlists
+  createLocalPlaylist: (name: string, description?: string) => ipcRenderer.invoke('create-local-playlist', name, description),
+  updateLocalPlaylist: (playlistId: string, updates: any) => ipcRenderer.invoke('update-local-playlist', playlistId, updates),
+  deleteLocalPlaylist: (playlistId: string) => ipcRenderer.invoke('delete-local-playlist', playlistId),
+  loadLocalPlaylists: () => ipcRenderer.invoke('load-local-playlists'),
+  addTrackToLocalPlaylist: (playlistId: string, track: any) => ipcRenderer.invoke('add-track-to-local-playlist', playlistId, track),
+  removeTrackFromLocalPlaylist: (playlistId: string, trackId: string) => ipcRenderer.invoke('remove-track-from-local-playlist', playlistId, trackId),
+
   // Search
-  searchAll: (query: string, musicOnly?: boolean) => ipcRenderer.invoke('search-all', query, musicOnly),
+  searchAll: (query: string, musicOnly?: boolean, platforms?: any) => ipcRenderer.invoke('search-all', query, musicOnly, platforms),
 
   // External links
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),

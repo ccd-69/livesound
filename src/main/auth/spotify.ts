@@ -1,15 +1,10 @@
 import { BrowserWindow, safeStorage, app } from 'electron';
-import https from 'https';
 import crypto from 'crypto';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const forge = require('node-forge') as typeof import('node-forge');
 import { URL } from 'url';
 import path from 'path';
 import fs from 'fs';
 
-const REDIRECT_PORT = 8888;
-const REDIRECT_URI = `https://localhost:${REDIRECT_PORT}/callback`;
+const REDIRECT_URI = 'https://localhost:8888/callback';
 
 let CLIENT_ID = '';
 
@@ -21,7 +16,6 @@ interface SpotifyTokens {
 
 let tokens: SpotifyTokens | null = null;
 const TOKEN_PATH = path.join(app.getPath('userData'), 'spotify-tokens.enc');
-let activeServer: https.Server | null = null;
 
 function loadClientId(): string {
   if (CLIENT_ID) return CLIENT_ID;
@@ -45,126 +39,6 @@ function generatePKCE(): { verifier: string; challenge: string } {
   const verifier = base64URLEncode(crypto.randomBytes(32));
   const challenge = base64URLEncode(sha256(verifier));
   return { verifier, challenge };
-}
-
-function generateSelfSignedCert(): { key: string; cert: string } {
-  const keys = forge.pki.rsa.generateKeyPair(2048);
-  const cert = forge.pki.createCertificate();
-
-  cert.publicKey = keys.publicKey;
-  cert.serialNumber = '01';
-  cert.validity.notBefore = new Date(Date.now() - 86400000);
-  cert.validity.notAfter = new Date(Date.now() + 86400000 * 365);
-
-  const attrs = [
-    { name: 'commonName', value: 'localhost' },
-    { name: 'countryName', value: 'US' },
-    { shortName: 'ST', value: 'Local' },
-    { name: 'localityName', value: 'Local' },
-    { name: 'organizationName', value: 'LiveSound' },
-    { shortName: 'OU', value: 'Auth' },
-  ];
-
-  cert.setSubject(attrs);
-  cert.setIssuer(attrs);
-  cert.setExtensions([
-    {
-      name: 'basicConstraints',
-      cA: true,
-    },
-    {
-      name: 'keyUsage',
-      keyCertSign: true,
-      digitalSignature: true,
-      nonRepudiation: true,
-      keyEncipherment: true,
-      dataEncipherment: true,
-    },
-    {
-      name: 'extKeyUsage',
-      serverAuth: true,
-      clientAuth: true,
-    },
-    {
-      name: 'subjectAltName',
-      altNames: [
-        { type: 2, value: 'localhost' },
-        { type: 7, ip: '127.0.0.1' },
-      ],
-    },
-  ]);
-
-  cert.sign(keys.privateKey, forge.md.sha256.create());
-
-  return {
-    key: forge.pki.privateKeyToPem(keys.privateKey),
-    cert: forge.pki.certificateToPem(cert),
-  };
-}
-
-function startRedirectServer(expectedState: string, verifier: string): Promise<SpotifyTokens> {
-  return new Promise((resolve, reject) => {
-    if (activeServer) {
-      try { activeServer.close(); } catch { /* ignore */ }
-      activeServer = null;
-    }
-
-    const { key, cert } = generateSelfSignedCert();
-
-    const server = https.createServer({ key, cert }, (req, res) => {
-      const url = new URL(req.url || '', `https://localhost:${REDIRECT_PORT}`);
-      const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
-      const error = url.searchParams.get('error');
-
-      if (error) {
-        res.writeHead(400, { 'Content-Type': 'text/html' });
-        res.end(`<html><body><h2>Auth failed</h2><p>${error}</p></body></html>`);
-        server.close(() => reject(new Error(error)));
-        return;
-      }
-
-      if (!code || state !== expectedState) {
-        res.writeHead(400, { 'Content-Type': 'text/html' });
-        res.end(`<html><body><h2>Auth failed</h2><p>Invalid state or missing code.</p></body></html>`);
-        server.close(() => reject(new Error('Invalid state')));
-        return;
-      }
-
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<html><body><h2>Spotify connected!</h2><p>You can close this window.</p></body></html>`);
-
-      exchangeCode(code, verifier)
-        .then((t) => {
-          server.close(() => resolve(t));
-        })
-        .catch((err) => {
-          server.close(() => reject(err));
-        });
-    });
-
-    activeServer = server;
-
-    server.listen(REDIRECT_PORT, () => {
-      console.log(`[Spotify Auth] HTTPS redirect server listening on ${REDIRECT_URI}`);
-    });
-
-    server.on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        // Force-close any hanging server on this port and try once more
-        try { server.close(); } catch { /* ignore */ }
-        const net = require('net');
-        const temp = net.createServer();
-        temp.once('error', () => reject(err));
-        temp.once('listening', () => {
-          temp.close(() => reject(err));
-        });
-        temp.listen(REDIRECT_PORT);
-        return;
-      }
-      reject(err);
-    });
-  });
 }
 
 async function exchangeCode(code: string, verifier: string): Promise<SpotifyTokens> {
@@ -262,48 +136,62 @@ export async function startAuth(): Promise<void> {
   authUrl.searchParams.set('code_challenge', challenge);
   authUrl.searchParams.set('scope', 'streaming user-read-email user-read-private user-library-read user-library-modify playlist-read-private playlist-read-collaborative user-read-playback-state user-modify-playback-state');
 
-  const win = new BrowserWindow({
-    width: 800,
-    height: 600,
-    title: 'Connect Spotify',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
+  return new Promise<void>((resolve, reject) => {
+    const win = new BrowserWindow({
+      width: 800,
+      height: 600,
+      title: 'Connect Spotify',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
 
-  // Allow the self-signed certificate for localhost redirect URLs (may include query params)
-  win.webContents.on('certificate-error', (event, urlStr, _error, _certificate, callback) => {
-    const parsed = new URL(urlStr);
-    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-      event.preventDefault();
-      callback(true);
-    } else {
-      callback(false);
-    }
-  });
+    let completed = false;
 
-  const serverPromise = startRedirectServer(state, verifier);
-  win.loadURL(authUrl.toString());
-
-  // Race against window being closed by user (cancelled)
-  const cancelPromise = new Promise<never>((_, reject) => {
-    const onClose = () => {
-      if (activeServer) {
-        try { activeServer.close(); } catch { /* ignore */ }
-        activeServer = null;
+    function finish(err?: Error, t?: SpotifyTokens) {
+      if (completed) return;
+      completed = true;
+      win.destroy();
+      if (err) reject(err);
+      else if (t) {
+        tokens = t;
+        persistTokens().then(() => resolve()).catch(reject);
       }
-      reject(new Error('Auth cancelled by user'));
-    };
-    win.on('closed', onClose);
-    // If the server resolves/rejects first, remove the listener so we don't leak
-    serverPromise.finally(() => win.off('closed', onClose));
-  });
+    }
 
-  const result = await Promise.race([serverPromise, cancelPromise]);
-  tokens = result;
-  await persistTokens();
-  win.close();
+    // Intercept the OAuth redirect before the browser tries to load it.
+    // Spotify sends a 302 to the redirect URI; we grab the code from the URL and close the window.
+    win.webContents.on('will-redirect', (event, url) => {
+      const parsed = new URL(url);
+      if (parsed.origin + parsed.pathname !== REDIRECT_URI) return;
+
+      event.preventDefault();
+
+      const code = parsed.searchParams.get('code');
+      const returnedState = parsed.searchParams.get('state');
+      const error = parsed.searchParams.get('error');
+
+      if (error) {
+        finish(new Error(error));
+        return;
+      }
+      if (!code || returnedState !== state) {
+        finish(new Error('Invalid state or missing code'));
+        return;
+      }
+
+      exchangeCode(code, verifier)
+        .then((t) => finish(undefined, t))
+        .catch((err) => finish(err));
+    });
+
+    win.on('closed', () => {
+      if (!completed) finish(new Error('Auth cancelled by user'));
+    });
+
+    win.loadURL(authUrl.toString()).catch((err) => finish(err));
+  });
 }
 
 export async function logout(): Promise<void> {
