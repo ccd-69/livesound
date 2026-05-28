@@ -3,6 +3,7 @@ let masterGain: GainNode | null = null;
 let compressor: DynamicsCompressorNode | null = null;
 let analyser: AnalyserNode | null = null;
 let destination: AudioDestinationNode | null = null;
+let fxInsert: GainNode | null = null;
 
 // Track which audio elements we've already created MediaElementAudioSourceNodes for.
 // createMediaElementSource() can only be called once per element.
@@ -30,11 +31,16 @@ function createGraph(): boolean {
     compressor.attack.value = 0.003;
     compressor.release.value = 0.25;
 
+    // FX insert point: sources connect here, FX rack inserts between this and masterGain
+    fxInsert = audioCtx.createGain();
+    fxInsert.gain.value = 1;
+
     // Master gain for global volume
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 1;
 
-    // Chain: masterGain → compressor → analyser → destination
+    // Chain: fxInsert → masterGain → compressor → analyser → destination
+    fxInsert.connect(masterGain);
     masterGain.connect(compressor);
     compressor.connect(analyser);
     analyser.connect(destination);
@@ -82,7 +88,7 @@ export function bridgeAudioElement(audioEl: HTMLAudioElement): MediaElementAudio
   }
 
   if (!connectedSources.has(source)) {
-    source.connect(masterGain);
+    source.connect(fxInsert || masterGain!);
     connectedSources.add(source);
     console.log('[AudioEngine] Bridged audio element');
   }
@@ -133,6 +139,14 @@ export function getSampleRate(): number {
 }
 
 /**
+ * Get the FX insert node. FX racks should connect sources to their input,
+ * and their output to this node, which feeds the master chain.
+ */
+export function getFXInsert(): GainNode | null {
+  return fxInsert;
+}
+
+/**
  * Get the AudioContext (for creating additional nodes).
  */
 export function getAudioContext(): AudioContext | null {
@@ -174,10 +188,12 @@ export function destroy(): void {
   });
   connectedSources.clear();
 
+  try { fxInsert?.disconnect(); } catch { /* ignore */ }
   try { masterGain?.disconnect(); } catch { /* ignore */ }
   try { compressor?.disconnect(); } catch { /* ignore */ }
   try { analyser?.disconnect(); } catch { /* ignore */ }
 
+  fxInsert = null;
   masterGain = null;
   compressor = null;
   analyser = null;

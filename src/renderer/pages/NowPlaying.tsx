@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { usePlayback } from '../hooks/usePlayback';
 import VisualizerCanvas, { VisualizerMode } from '../components/VisualizerCanvas';
+import FXRack from '../components/FXRack';
 import LyricsDisplay from '../components/LyricsDisplay';
 
 function formatTime(ms: number) {
@@ -169,6 +170,8 @@ export default function NowPlaying() {
               <VisualizerCanvas mode={visualizerMode} barCount={64} height={120} />
             </div>
           )}
+
+          <FXRack />
 
           {/* Track Info */}
           <div className="flex flex-col items-center gap-1 text-center">
